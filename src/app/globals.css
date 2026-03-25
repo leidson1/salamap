@@ -128,3 +128,17 @@
     @apply font-sans;
   }
 }
+
+/* Classroom floor tile pattern */
+.classroom-floor {
+  background-image:
+    repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(0,0,0,0.018) 59px, rgba(0,0,0,0.018) 60px),
+    repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(0,0,0,0.018) 59px, rgba(0,0,0,0.018) 60px);
+}
+
+/* Blocked cell diagonal stripes */
+.blocked-stripes {
+  background-image: repeating-linear-gradient(
+    45deg, transparent, transparent 4px, rgba(0,0,0,0.045) 4px, rgba(0,0,0,0.045) 8px
+  );
+}

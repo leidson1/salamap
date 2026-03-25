@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx:*)",
+      "Bash(for f:*)",
+      "Bash(do sed:*)",
+      "Bash(done)",
+      "WebFetch(domain:profdia.com.br)",
+      "Bash(gh repo:*)",
+      "WebSearch",
+      "WebFetch(domain:seatingchartmaker.app)",
+      "WebFetch(domain:www.101planners.com)"
+    ]
+  }
+}

@@ -56,6 +56,20 @@ export interface GridCell {
 
 export type Grid = GridCell[][]
 
+export interface RoomConfig {
+  doorPosition: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
+  windowWall: 'left' | 'right' | 'none'
+  windowCount: number
+  boardLabel: string
+}
+
+export const DEFAULT_ROOM_CONFIG: RoomConfig = {
+  doorPosition: 'bottom-left',
+  windowWall: 'left',
+  windowCount: 3,
+  boardLabel: 'Quadro',
+}
+
 export interface Mapa {
   id: number
   user_id: string
@@ -67,6 +81,7 @@ export interface Mapa {
   layout_tipo: string
   grid: Grid
   mesa_professor: { linha: number; coluna: number } | null
+  room_config: RoomConfig | null
   updated_at: string
   created_at: string
 }
@@ -98,6 +113,7 @@ export interface PublicMapData {
     layout_tipo: string
     grid: Grid
     mesa_professor: { linha: number; coluna: number } | null
+    room_config: RoomConfig | null
     updated_at: string
   }
   turma: {

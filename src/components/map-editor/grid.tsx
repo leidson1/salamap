@@ -13,16 +13,18 @@ import {
 } from '@dnd-kit/core'
 import { useState } from 'react'
 import { DeskCell } from './desk-cell'
-import type { Grid, Aluno, CellType } from '@/types/database'
+import { ClassroomFrame } from './classroom-frame'
+import type { Grid, Aluno, CellType, RoomConfig } from '@/types/database'
 
 interface MapGridProps {
   grid: Grid
   colunas: number
   alunos: Aluno[]
+  roomConfig?: RoomConfig | null
   onGridChange: (grid: Grid) => void
 }
 
-export function MapGrid({ grid, colunas, alunos, onGridChange }: MapGridProps) {
+export function MapGrid({ grid, colunas, alunos, roomConfig, onGridChange }: MapGridProps) {
   const [activeDrag, setActiveDrag] = useState<Aluno | null>(null)
 
   const pointerSensor = useSensor(PointerSensor, {
@@ -88,10 +90,9 @@ export function MapGrid({ grid, colunas, alunos, onGridChange }: MapGridProps) {
           }
         }
 
-        // If target has a student, swap: move that student to old position
+        // If target has a student, swap
         const existingAlunoId = targetCell.alunoId
         if (existingAlunoId !== null && activeData.source === 'grid') {
-          // Find old position of dragged student in original grid
           for (let r = 0; r < grid.length; r++) {
             for (let c = 0; c < grid[r].length; c++) {
               if (grid[r][c].alunoId === draggedAluno.id) {
@@ -118,7 +119,6 @@ export function MapGrid({ grid, colunas, alunos, onGridChange }: MapGridProps) {
       const newGrid = grid.map((r) => r.map((c) => ({ ...c })))
       const cell = newGrid[row][col]
 
-      // Cycle: carteira -> vazio -> bloqueado -> professor -> carteira
       const cycle: CellType[] = ['carteira', 'vazio', 'bloqueado', 'professor']
       const currentIdx = cycle.indexOf(cell.tipo)
       cell.tipo = cycle[(currentIdx + 1) % cycle.length]
@@ -144,34 +144,42 @@ export function MapGrid({ grid, colunas, alunos, onGridChange }: MapGridProps) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div
-        className="grid gap-2 p-4 rounded-lg border bg-gray-50/80"
-        style={{
-          gridTemplateColumns: `repeat(${colunas}, minmax(70px, 1fr))`,
-        }}
-      >
-        {grid.map((row, rIdx) =>
-          row.map((cell, cIdx) => (
-            <DeskCell
-              key={`${rIdx}-${cIdx}`}
-              cell={cell}
-              row={rIdx}
-              col={cIdx}
-              aluno={cell.alunoId ? alunoMap.get(cell.alunoId) ?? null : null}
-              onToggleType={handleToggleType}
-              onRemoveStudent={handleRemoveStudent}
-            />
-          ))
-        )}
-      </div>
+      <ClassroomFrame roomConfig={roomConfig}>
+        <div
+          className="grid gap-3"
+          style={{
+            gridTemplateColumns: `repeat(${colunas}, minmax(80px, 1fr))`,
+          }}
+        >
+          {grid.map((row, rIdx) =>
+            row.map((cell, cIdx) => (
+              <DeskCell
+                key={`${rIdx}-${cIdx}`}
+                cell={cell}
+                row={rIdx}
+                col={cIdx}
+                aluno={cell.alunoId ? alunoMap.get(cell.alunoId) ?? null : null}
+                onToggleType={handleToggleType}
+                onRemoveStudent={handleRemoveStudent}
+              />
+            ))
+          )}
+        </div>
+      </ClassroomFrame>
 
+      {/* Drag overlay - mini desk shape */}
       <DragOverlay>
         {activeDrag && (
-          <div className="flex items-center gap-2 rounded-lg border-2 border-emerald-400 bg-white px-3 py-2 text-sm shadow-xl">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
-              {activeDrag.numero ?? '?'}
-            </span>
-            <span className="font-medium">{activeDrag.nome}</span>
+          <div className="pointer-events-none">
+            <div className="w-20 rounded-t-lg rounded-b-sm bg-amber-100 border-2 border-amber-400 px-2 py-1.5 shadow-2xl text-center">
+              <span className="flex h-5 w-5 mx-auto items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700">
+                {activeDrag.numero ?? '?'}
+              </span>
+              <span className="text-[9px] font-medium block mt-0.5 truncate text-amber-900">
+                {activeDrag.nome.split(' ')[0]}
+              </span>
+            </div>
+            <div className="w-5 h-2 bg-stone-400 rounded-b-full mx-auto" />
           </div>
         )}
       </DragOverlay>

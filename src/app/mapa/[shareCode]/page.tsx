@@ -73,11 +73,12 @@ export default async function PublicMapPage({ params }: PageProps) {
         </div>
 
         {/* Map grid */}
-        <div className="rounded-lg border bg-white p-3 sm:p-4 overflow-x-auto">
+        <div className="overflow-x-auto">
           <PublicGrid
             grid={mapData.mapa.grid}
             colunas={mapData.mapa.colunas}
             alunoMap={alunoMap}
+            roomConfig={mapData.mapa.room_config}
           />
         </div>
 

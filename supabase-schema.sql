@@ -95,6 +95,7 @@ BEGIN
       'layout_tipo', m.layout_tipo,
       'grid', m.grid,
       'mesa_professor', m.mesa_professor,
+      'room_config', m.room_config,
       'updated_at', m.updated_at
     ),
     'turma', jsonb_build_object(

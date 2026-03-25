@@ -15,7 +15,8 @@ import { useAutoSave } from '@/hooks/use-auto-save'
 import { generateTradicional, generateU, generateGrupos, clearStudentsFromGrid } from '@/lib/map/presets'
 import { resizeGrid, getPlacedStudentIds } from '@/lib/map/utils'
 import { useWorkspace } from '@/contexts/workspace-context'
-import type { Turma, Aluno, Grid, Mapa } from '@/types/database'
+import type { Turma, Aluno, Grid, Mapa, RoomConfig } from '@/types/database'
+import { DEFAULT_ROOM_CONFIG } from '@/types/database'
 
 export default function MapaEditorPage() {
   const params = useParams()
@@ -31,6 +32,7 @@ export default function MapaEditorPage() {
   const [linhas, setLinhas] = useState(5)
   const [colunas, setColunas] = useState(6)
   const [layoutTipo, setLayoutTipo] = useState('tradicional')
+  const [roomConfig, setRoomConfig] = useState<RoomConfig>(DEFAULT_ROOM_CONFIG)
   const [loading, setLoading] = useState(true)
 
   const saveFn = useCallback(async () => {
@@ -45,6 +47,7 @@ export default function MapaEditorPage() {
           linhas,
           colunas,
           layout_tipo: layoutTipo,
+          room_config: roomConfig,
         })
         .eq('id', mapa.id)
 
@@ -60,6 +63,7 @@ export default function MapaEditorPage() {
           linhas,
           colunas,
           layout_tipo: layoutTipo,
+          room_config: roomConfig,
         })
         .select()
         .single()
@@ -67,7 +71,7 @@ export default function MapaEditorPage() {
       if (error) throw error
       if (data) setMapa(data as Mapa)
     }
-  }, [grid, linhas, colunas, layoutTipo, mapa, turmaId, supabase])
+  }, [grid, linhas, colunas, layoutTipo, roomConfig, mapa, turmaId, supabase])
 
   const { trigger: triggerSave, saveStatus } = useAutoSave(saveFn)
 
@@ -97,6 +101,7 @@ export default function MapaEditorPage() {
           setLinhas(m.linhas)
           setColunas(m.colunas)
           setLayoutTipo(m.layout_tipo)
+          if (m.room_config) setRoomConfig(m.room_config)
         } else {
           // No map yet, create default grid
           const defaultGrid = generateTradicional(5, 6)
@@ -267,6 +272,7 @@ export default function MapaEditorPage() {
             grid={grid}
             colunas={colunas}
             alunos={alunos}
+            roomConfig={roomConfig}
             onGridChange={handleGridChange}
           />
         </div>
