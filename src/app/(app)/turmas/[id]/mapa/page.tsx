@@ -23,8 +23,8 @@ import { Toolbar } from '@/components/map-editor/toolbar'
 import { useAutoSave } from '@/hooks/use-auto-save'
 import { generateTradicional, generateU, generateGrupos, clearStudentsFromGrid } from '@/lib/map/presets'
 import { resizeGrid, getPlacedStudentIds } from '@/lib/map/utils'
-import type { Turma, Aluno, Grid, Mapa, CellType } from '@/types/database'
-import { DoorOpen, PanelTop, Square, Ban, User } from 'lucide-react'
+import type { Turma, Aluno, Grid, Mapa, RoomConfig, CellType } from '@/types/database'
+import { DEFAULT_ROOM_CONFIG } from '@/types/database'
 
 export default function MapaEditorPage() {
   const params = useParams()
@@ -39,16 +39,17 @@ export default function MapaEditorPage() {
   const [linhas, setLinhas] = useState(5)
   const [colunas, setColunas] = useState(6)
   const [layoutTipo, setLayoutTipo] = useState('tradicional')
+  const [roomConfig, setRoomConfig] = useState<RoomConfig>(DEFAULT_ROOM_CONFIG)
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<'alunos' | 'mobiliar'>('alunos')
-  const [activeDragData, setActiveDragData] = useState<{ type: 'student'; aluno: Aluno } | { type: 'cell'; row: number; col: number; cell: { tipo: CellType } } | null>(null)
+  const [activeDragData, setActiveDragData] = useState<
+    | { type: 'student'; aluno: Aluno }
+    | { type: 'cell'; row: number; col: number; cellType: CellType }
+    | null
+  >(null)
 
-  const pointerSensor = useSensor(PointerSensor, {
-    activationConstraint: { distance: 5 },
-  })
-  const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 200, tolerance: 5 },
-  })
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const sensors = useSensors(pointerSensor, touchSensor)
 
   const saveFn = useCallback(async () => {
@@ -60,9 +61,9 @@ export default function MapaEditorPage() {
         .from('mapas')
         .update({
           grid: JSON.parse(JSON.stringify(grid)),
-          linhas,
-          colunas,
+          linhas, colunas,
           layout_tipo: layoutTipo,
+          room_config: roomConfig,
         })
         .eq('id', mapa.id)
       if (error) throw error
@@ -70,19 +71,17 @@ export default function MapaEditorPage() {
       const { data, error } = await supabase
         .from('mapas')
         .insert({
-          user_id: user.id,
-          turma_id: turmaId,
+          user_id: user.id, turma_id: turmaId,
           grid: JSON.parse(JSON.stringify(grid)),
-          linhas,
-          colunas,
+          linhas, colunas,
           layout_tipo: layoutTipo,
+          room_config: roomConfig,
         })
-        .select()
-        .single()
+        .select().single()
       if (error) throw error
       if (data) setMapa(data as Mapa)
     }
-  }, [grid, linhas, colunas, layoutTipo, mapa, turmaId, supabase])
+  }, [grid, linhas, colunas, layoutTipo, roomConfig, mapa, turmaId, supabase])
 
   const { trigger: triggerSave, saveStatus } = useAutoSave(saveFn)
 
@@ -91,16 +90,10 @@ export default function MapaEditorPage() {
       try {
         const [turmaRes, alunosRes, mapaRes] = await Promise.all([
           supabase.from('sala_turmas').select('*').eq('id', turmaId).single(),
-          supabase
-            .from('sala_alunos')
-            .select('*')
-            .eq('turma_id', turmaId)
-            .eq('ativo', true)
-            .order('numero', { nullsFirst: false })
-            .order('nome'),
+          supabase.from('sala_alunos').select('*').eq('turma_id', turmaId).eq('ativo', true)
+            .order('numero', { nullsFirst: false }).order('nome'),
           supabase.from('mapas').select('*').eq('turma_id', turmaId).single(),
         ])
-
         if (turmaRes.error) throw turmaRes.error
         setTurma(turmaRes.data as Turma)
         setAlunos((alunosRes.data as Aluno[]) || [])
@@ -112,6 +105,7 @@ export default function MapaEditorPage() {
           setLinhas(m.linhas)
           setColunas(m.colunas)
           setLayoutTipo(m.layout_tipo)
+          if (m.room_config) setRoomConfig(m.room_config as RoomConfig)
         } else {
           setGrid(generateTradicional(5, 6))
         }
@@ -124,13 +118,13 @@ export default function MapaEditorPage() {
     loadData()
   }, [turmaId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // --- DnD handlers ---
+  // DnD
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current
     if (data?.aluno) {
       setActiveDragData({ type: 'student', aluno: data.aluno as Aluno })
     } else if (data?.type === 'cell') {
-      setActiveDragData({ type: 'cell', row: data.row as number, col: data.col as number, cell: data.cell as { tipo: CellType } })
+      setActiveDragData({ type: 'cell', row: data.row as number, col: data.col as number, cellType: (data.cell as { tipo: CellType }).tipo })
     }
   }, [])
 
@@ -138,162 +132,77 @@ export default function MapaEditorPage() {
     (event: DragEndEvent) => {
       const dragData = activeDragData
       setActiveDragData(null)
-
       const { over } = event
       if (!over || !dragData) return
-
       const overData = over.data.current
 
-      // === MODE: ALUNOS - drag students ===
+      // Student drag
       if (dragData.type === 'student') {
         const draggedAluno = dragData.aluno
-
         if (overData?.type === 'sidebar') {
-          const newGrid = grid.map((row) =>
-            row.map((cell) =>
-              cell.alunoId === draggedAluno.id ? { ...cell, alunoId: null } : cell
-            )
-          )
-          setGrid(newGrid)
-          triggerSave()
-          return
+          const newGrid = grid.map(row => row.map(cell =>
+            cell.alunoId === draggedAluno.id ? { ...cell, alunoId: null } : cell
+          ))
+          setGrid(newGrid); triggerSave(); return
         }
-
         if (overData?.row !== undefined && overData?.col !== undefined) {
-          const tRow = overData.row as number
-          const tCol = overData.col as number
-          const targetCell = grid[tRow]?.[tCol]
-          if (!targetCell || (targetCell.tipo !== 'carteira' && targetCell.tipo !== 'vazio')) return
-
-          const newGrid = grid.map((row) => row.map((cell) => ({ ...cell })))
-
-          // Find and clear old position
-          let oldRow = -1, oldCol = -1
-          for (let r = 0; r < newGrid.length; r++) {
-            for (let c = 0; c < newGrid[r].length; c++) {
-              if (newGrid[r][c].alunoId === draggedAluno.id) {
-                oldRow = r; oldCol = c
-                newGrid[r][c].alunoId = null
-              }
-            }
-          }
-
-          // Swap students if target occupied
-          const existingAlunoId = targetCell.alunoId
-          if (existingAlunoId !== null && oldRow >= 0) {
-            newGrid[oldRow][oldCol].alunoId = existingAlunoId
-          }
-
-          if (newGrid[tRow][tCol].tipo === 'vazio') {
-            newGrid[tRow][tCol].tipo = 'carteira'
-          }
-          newGrid[tRow][tCol].alunoId = draggedAluno.id
-          setGrid(newGrid)
-          triggerSave()
+          const tR = overData.row as number, tC = overData.col as number
+          const target = grid[tR]?.[tC]
+          if (!target || (target.tipo !== 'carteira' && target.tipo !== 'vazio')) return
+          const newGrid = grid.map(row => row.map(cell => ({ ...cell })))
+          let oR = -1, oC = -1
+          for (let r = 0; r < newGrid.length; r++)
+            for (let c = 0; c < newGrid[r].length; c++)
+              if (newGrid[r][c].alunoId === draggedAluno.id) { oR = r; oC = c; newGrid[r][c].alunoId = null }
+          if (target.alunoId !== null && oR >= 0) newGrid[oR][oC].alunoId = target.alunoId
+          if (newGrid[tR][tC].tipo === 'vazio') newGrid[tR][tC].tipo = 'carteira'
+          newGrid[tR][tC].alunoId = draggedAluno.id
+          setGrid(newGrid); triggerSave()
         }
         return
       }
 
-      // === MODE: MOBILIAR - drag cells (swap) ===
+      // Cell drag (mobiliar mode - swap)
       if (dragData.type === 'cell' && overData?.row !== undefined && overData?.col !== undefined) {
-        const fromRow = dragData.row
-        const fromCol = dragData.col
-        const toRow = overData.row as number
-        const toCol = overData.col as number
-
-        if (fromRow === toRow && fromCol === toCol) return
-
-        const newGrid = grid.map((row) => row.map((cell) => ({ ...cell })))
-        // Swap cells
-        const temp = { ...newGrid[fromRow][fromCol] }
-        newGrid[fromRow][fromCol] = { ...newGrid[toRow][toCol] }
-        newGrid[toRow][toCol] = temp
-
-        setGrid(newGrid)
-        triggerSave()
+        const fR = dragData.row, fC = dragData.col
+        const tR = overData.row as number, tC = overData.col as number
+        if (fR === tR && fC === tC) return
+        const newGrid = grid.map(row => row.map(cell => ({ ...cell })))
+        const temp = { ...newGrid[fR][fC] }
+        newGrid[fR][fC] = { ...newGrid[tR][tC] }
+        newGrid[tR][tC] = temp
+        setGrid(newGrid); triggerSave()
       }
     },
     [grid, activeDragData, triggerSave]
   )
 
-  const handleGridChange = useCallback(
-    (newGrid: Grid) => {
-      setGrid(newGrid)
-      triggerSave()
-    },
-    [triggerSave]
-  )
+  const handleGridChange = useCallback((newGrid: Grid) => { setGrid(newGrid); triggerSave() }, [triggerSave])
+  const handleRoomConfigChange = useCallback((config: RoomConfig) => { setRoomConfig(config); triggerSave() }, [triggerSave])
 
-  const handleLinhasChange = useCallback(
-    (val: number) => {
-      setLinhas(val)
-      setGrid((prev) => resizeGrid(prev, val, colunas))
-      triggerSave()
-    },
-    [colunas, triggerSave]
-  )
+  const handleLinhasChange = useCallback((val: number) => {
+    setLinhas(val); setGrid(prev => resizeGrid(prev, val, colunas)); triggerSave()
+  }, [colunas, triggerSave])
 
-  const handleColunasChange = useCallback(
-    (val: number) => {
-      setColunas(val)
-      setGrid((prev) => resizeGrid(prev, linhas, val))
-      triggerSave()
-    },
-    [linhas, triggerSave]
-  )
+  const handleColunasChange = useCallback((val: number) => {
+    setColunas(val); setGrid(prev => resizeGrid(prev, linhas, val)); triggerSave()
+  }, [linhas, triggerSave])
 
-  const handleLayoutChange = useCallback(
-    (val: string) => {
-      setLayoutTipo(val)
-      let newGrid: Grid
-      switch (val) {
-        case 'u': newGrid = generateU(linhas, colunas); break
-        case 'grupos': newGrid = generateGrupos(linhas, colunas); break
-        default: newGrid = generateTradicional(linhas, colunas)
-      }
-      setGrid(newGrid)
-      triggerSave()
-    },
-    [linhas, colunas, triggerSave]
-  )
+  const handleLayoutChange = useCallback((val: string) => {
+    setLayoutTipo(val)
+    const gen = val === 'u' ? generateU : val === 'grupos' ? generateGrupos : generateTradicional
+    setGrid(gen(linhas, colunas)); triggerSave()
+  }, [linhas, colunas, triggerSave])
 
-  const handleClear = useCallback(() => {
-    setGrid((prev) => clearStudentsFromGrid(prev))
-    triggerSave()
-  }, [triggerSave])
-
-  const handleReset = useCallback(() => {
-    handleLayoutChange(layoutTipo)
-  }, [layoutTipo, handleLayoutChange])
+  const handleClear = useCallback(() => { setGrid(prev => clearStudentsFromGrid(prev)); triggerSave() }, [triggerSave])
+  const handleReset = useCallback(() => { handleLayoutChange(layoutTipo) }, [layoutTipo, handleLayoutChange])
 
   const handleManualSave = useCallback(async () => {
-    try {
-      await saveFn()
-      toast.success('Mapa salvo com sucesso!')
-    } catch {
-      toast.error('Erro ao salvar mapa.')
-    }
+    try { await saveFn(); toast.success('Mapa salvo!') } catch { toast.error('Erro ao salvar.') }
   }, [saveFn])
 
-  const handleAddElement = useCallback((tipo: CellType) => {
-    // Find first empty cell and place the element
-    const newGrid = grid.map((row) => row.map((cell) => ({ ...cell })))
-    for (let r = 0; r < newGrid.length; r++) {
-      for (let c = 0; c < newGrid[r].length; c++) {
-        if (newGrid[r][c].tipo === 'vazio') {
-          newGrid[r][c] = { tipo, alunoId: null }
-          setGrid(newGrid)
-          triggerSave()
-          toast.success(`${tipo.charAt(0).toUpperCase() + tipo.slice(1)} adicionado!`)
-          return
-        }
-      }
-    }
-    toast.error('Nao ha espaco vazio no grid.')
-  }, [grid, triggerSave])
-
   const handlePrintMap = useCallback(() => {
-    const alunoMap = new Map(alunos.map((a) => [a.id, a]))
+    const alunoMap = new Map(alunos.map(a => [a.id, a]))
     import('@/lib/pdf/map-generator').then(({ generateMapPdf }) => {
       generateMapPdf({ grid, linhas, colunas, serie: turma?.serie || '', turma: turma?.turma || '', turno: turma?.turno || '', alunoMap })
     })
@@ -301,7 +210,7 @@ export default function MapaEditorPage() {
 
   const handlePrintList = useCallback(() => {
     import('@/lib/pdf/student-list-generator').then(({ generateStudentListPdf }) => {
-      generateStudentListPdf({ serie: turma?.serie || '', turma: turma?.turma || '', turno: turma?.turno || '', alunos: alunos.map((a) => ({ nome: a.nome, numero: a.numero })) })
+      generateStudentListPdf({ serie: turma?.serie || '', turma: turma?.turma || '', turno: turma?.turno || '', alunos: alunos.map(a => ({ nome: a.nome, numero: a.numero })) })
     })
   }, [alunos, turma])
 
@@ -317,73 +226,44 @@ export default function MapaEditorPage() {
     )
   }
 
-  // Overlay icon for mobiliar drag
-  const cellOverlayIcon = (tipo: CellType) => {
-    switch (tipo) {
-      case 'porta': return <DoorOpen className="size-5 text-amber-700" />
-      case 'quadro': return <PanelTop className="size-5 text-stone-500" />
-      case 'janela': return <Square className="size-5 text-sky-500" />
-      case 'bloqueado': return <Ban className="size-5 text-stone-400" />
-      case 'professor': return <User className="size-5 text-sky-600" />
-      default: return <span className="text-xs font-bold text-amber-700">Mesa</span>
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <Button variant="ghost" size="sm" onClick={() => router.push('/turmas')} className="-ml-2 text-muted-foreground mb-1">
-            <ArrowLeft className="size-4 mr-1" />
-            Voltar
+            <ArrowLeft className="size-4 mr-1" /> Voltar
           </Button>
-          <h1 className="text-xl font-semibold tracking-tight">
-            Mapa de Sala - {turma?.serie} {turma?.turma}
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">Mapa de Sala - {turma?.serie} {turma?.turma}</h1>
           <p className="text-sm text-muted-foreground">
-            {mode === 'alunos' ? 'Arraste os alunos para as carteiras' : 'Arraste os elementos para reorganizar a sala'}
+            {mode === 'alunos' ? 'Arraste os alunos para as carteiras' : 'Arraste mesas para trocar posicao | Clique nas paredes para mover elementos'}
           </p>
         </div>
         {mapa && (
           <Button variant="outline" render={<Link href={`/turmas/${turmaId}/compartilhar`} />}>
-            <Share2 className="size-4 mr-1" />
-            Compartilhar
+            <Share2 className="size-4 mr-1" /> Compartilhar
           </Button>
         )}
       </div>
 
       <Toolbar
-        linhas={linhas}
-        colunas={colunas}
-        layoutTipo={layoutTipo}
-        saveStatus={saveStatus}
-        mode={mode}
-        onLinhasChange={handleLinhasChange}
-        onColunasChange={handleColunasChange}
-        onLayoutChange={handleLayoutChange}
-        onClear={handleClear}
-        onReset={handleReset}
-        onSave={handleManualSave}
-        onModeChange={setMode}
-        onAddElement={handleAddElement}
-        onPrintMap={handlePrintMap}
-        onPrintList={handlePrintList}
+        linhas={linhas} colunas={colunas} layoutTipo={layoutTipo}
+        saveStatus={saveStatus} mode={mode}
+        onLinhasChange={handleLinhasChange} onColunasChange={handleColunasChange}
+        onLayoutChange={handleLayoutChange} onClear={handleClear} onReset={handleReset}
+        onSave={handleManualSave} onModeChange={setMode}
+        onPrintMap={handlePrintMap} onPrintList={handlePrintList}
       />
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1 overflow-x-auto">
             <MapGrid
-              grid={grid}
-              colunas={colunas}
-              alunos={alunos}
-              mode={mode}
-              onGridChange={handleGridChange}
+              grid={grid} colunas={colunas} alunos={alunos} mode={mode}
+              roomConfig={roomConfig} interactive={mode === 'mobiliar'}
+              onGridChange={handleGridChange} onRoomConfigChange={handleRoomConfigChange}
             />
           </div>
-          {mode === 'alunos' && (
-            <StudentSidebar alunos={alunos} placedIds={placedIds} />
-          )}
+          {mode === 'alunos' && <StudentSidebar alunos={alunos} placedIds={placedIds} />}
         </div>
 
         <DragOverlay>
@@ -401,8 +281,10 @@ export default function MapaEditorPage() {
             </div>
           )}
           {activeDragData?.type === 'cell' && (
-            <div className="pointer-events-none flex items-center justify-center w-20 h-16 rounded-lg bg-white border-2 border-stone-400 shadow-2xl">
-              {cellOverlayIcon(activeDragData.cell.tipo)}
+            <div className="pointer-events-none w-20 h-16 rounded-lg bg-amber-100 border-2 border-amber-400 shadow-2xl flex items-center justify-center">
+              <span className="text-xs font-bold text-amber-700">
+                {activeDragData.cellType === 'professor' ? 'Prof.' : 'Mesa'}
+              </span>
             </div>
           )}
         </DragOverlay>

@@ -11,9 +11,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   Eraser, RotateCcw, Save, Check, Loader2, AlertCircle,
-  Printer, FileText, Users, Move, Plus, DoorOpen, PanelTop, Square, Ban,
+  Printer, FileText, Users, Move,
 } from 'lucide-react'
-import type { CellType } from '@/types/database'
 
 interface ToolbarProps {
   linhas: number
@@ -28,7 +27,6 @@ interface ToolbarProps {
   onReset: () => void
   onSave: () => void
   onModeChange: (mode: 'alunos' | 'mobiliar') => void
-  onAddElement?: (tipo: CellType) => void
   onPrintMap?: () => void
   onPrintList?: () => void
 }
@@ -36,7 +34,7 @@ interface ToolbarProps {
 export function Toolbar({
   linhas, colunas, layoutTipo, saveStatus, mode,
   onLinhasChange, onColunasChange, onLayoutChange,
-  onClear, onReset, onSave, onModeChange, onAddElement,
+  onClear, onReset, onSave, onModeChange,
   onPrintMap, onPrintList,
 }: ToolbarProps) {
   return (
@@ -65,6 +63,11 @@ export function Toolbar({
           <Move className="size-3.5" />
           Mobiliar
         </button>
+        {mode === 'mobiliar' && (
+          <span className="text-[10px] text-muted-foreground ml-2 hidden sm:inline">
+            Arraste mesas para trocar posicao | Clique nas paredes para mover porta/quadro/janelas
+          </span>
+        )}
       </div>
 
       {/* Controls */}
@@ -106,38 +109,6 @@ export function Toolbar({
             </SelectContent>
           </Select>
         </div>
-
-        {/* Add element (mobiliar mode) */}
-        {mode === 'mobiliar' && onAddElement && (
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-              <Plus className="size-3.5 mr-1" />
-              Adicionar
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => onAddElement('porta')}>
-                <DoorOpen className="size-4" />
-                Porta
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onAddElement('quadro')}>
-                <PanelTop className="size-4" />
-                Quadro
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onAddElement('janela')}>
-                <Square className="size-4" />
-                Janela
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onAddElement('bloqueado')}>
-                <Ban className="size-4" />
-                Obstaculo
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onAddElement('professor')}>
-                <Users className="size-4" />
-                Mesa Professor
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
 
         <div className="flex gap-1.5 ml-auto">
           {(onPrintMap || onPrintList) && (

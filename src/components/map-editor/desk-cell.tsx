@@ -3,8 +3,8 @@
 import { useDroppable, useDraggable } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
 import { StudentCard } from './student-card'
-import { X, User, Ban, DoorOpen, PanelTop, Square } from 'lucide-react'
-import type { GridCell, Aluno } from '@/types/database'
+import { X, User, Ban } from 'lucide-react'
+import type { GridCell, Aluno, CellType } from '@/types/database'
 
 interface DeskCellProps {
   cell: GridCell
@@ -25,43 +25,6 @@ function Chair({ muted = false }: { muted?: boolean }) {
   )
 }
 
-function DraggableWrapper({
-  id,
-  data,
-  enabled,
-  children,
-}: {
-  id: string
-  data: Record<string, unknown>
-  enabled: boolean
-  children: React.ReactNode
-}) {
-  const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({
-    id,
-    data,
-    disabled: !enabled,
-  })
-
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 }
-    : undefined
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...(enabled ? listeners : {})}
-      {...(enabled ? attributes : {})}
-      className={cn(
-        enabled && 'cursor-grab active:cursor-grabbing',
-        isDragging && 'opacity-30'
-      )}
-    >
-      {children}
-    </div>
-  )
-}
-
 export function DeskCell({ cell, row, col, aluno, mode, onToggleType, onRemoveStudent }: DeskCellProps) {
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `cell-${row}-${col}`,
@@ -71,79 +34,41 @@ export function DeskCell({ cell, row, col, aluno, mode, onToggleType, onRemoveSt
   const isMobiliar = mode === 'mobiliar'
   const canDrag = isMobiliar && cell.tipo !== 'vazio'
 
+  const { setNodeRef: setDragRef, attributes, listeners, transform, isDragging } = useDraggable({
+    id: `drag-cell-${row}-${col}`,
+    data: { row, col, cell, type: 'cell' },
+    disabled: !canDrag,
+  })
+
+  const dragStyle = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 }
+    : undefined
+
   const content = (() => {
-    // ---- VAZIO (empty floor) ----
+    // ---- VAZIO ----
     if (cell.tipo === 'vazio') {
       return (
         <div
-          onClick={() => isMobiliar && onToggleType(row, col)}
+          onClick={() => onToggleType(row, col)}
           className={cn(
-            'h-20 rounded-lg border border-transparent transition-all',
-            isMobiliar && 'cursor-pointer hover:border-dashed hover:border-stone-300',
+            'h-20 rounded-lg border border-transparent cursor-pointer transition-all',
+            'hover:border-dashed hover:border-stone-300',
             isOver && 'border-dashed border-emerald-400 bg-emerald-50/40'
           )}
         />
       )
     }
 
-    // ---- PORTA ----
-    if (cell.tipo === 'porta') {
-      return (
-        <div className="h-20">
-          <div className={cn(
-            'flex items-center justify-center rounded-lg h-[62px] transition-all',
-            'bg-amber-700/15 border-2 border-amber-700/40',
-            isOver && 'ring-2 ring-emerald-400'
-          )}>
-            <div className="text-center">
-              <DoorOpen className="size-5 text-amber-700 mx-auto" />
-              <span className="text-[9px] font-bold text-amber-700">Porta</span>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    // ---- QUADRO ----
-    if (cell.tipo === 'quadro') {
-      return (
-        <div className="h-20">
-          <div className={cn(
-            'flex items-center justify-center rounded-lg h-[62px] transition-all',
-            'bg-white border-2 border-stone-300 shadow-sm',
-            isOver && 'ring-2 ring-emerald-400'
-          )}>
-            <div className="text-center">
-              <PanelTop className="size-5 text-stone-500 mx-auto" />
-              <span className="text-[9px] font-bold text-stone-500">Quadro</span>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    // ---- JANELA ----
-    if (cell.tipo === 'janela') {
-      return (
-        <div className="h-20">
-          <div className={cn(
-            'flex items-center justify-center rounded-lg h-[62px] transition-all',
-            'bg-sky-100/80 border-2 border-sky-400/60',
-            isOver && 'ring-2 ring-emerald-400'
-          )}>
-            <div className="text-center">
-              <Square className="size-5 text-sky-500 mx-auto" />
-              <span className="text-[9px] font-bold text-sky-500">Janela</span>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
     // ---- BLOQUEADO ----
     if (cell.tipo === 'bloqueado') {
       return (
-        <div className="flex items-center justify-center rounded-lg bg-stone-200/60 blocked-stripes h-20 transition-all">
+        <div
+          onClick={() => onToggleType(row, col)}
+          className={cn(
+            'flex items-center justify-center rounded-lg bg-stone-200/60 blocked-stripes h-20 cursor-pointer transition-all hover:bg-stone-200/80',
+            isOver && 'ring-2 ring-emerald-400'
+          )}
+        >
           <Ban className="size-4 text-stone-400" />
         </div>
       )
@@ -152,7 +77,7 @@ export function DeskCell({ cell, row, col, aluno, mode, onToggleType, onRemoveSt
     // ---- PROFESSOR ----
     if (cell.tipo === 'professor') {
       return (
-        <div className="h-20">
+        <div className="h-20" onClick={() => isMobiliar && onToggleType(row, col)}>
           <div className={cn(
             'flex items-center justify-center rounded-lg bg-sky-100 border-2 border-sky-400 h-[62px] shadow-md transition-shadow',
             isOver && 'ring-2 ring-emerald-400'
@@ -168,7 +93,7 @@ export function DeskCell({ cell, row, col, aluno, mode, onToggleType, onRemoveSt
     }
 
     // ---- CARTEIRA COM ALUNO ----
-    if (cell.tipo === 'carteira' && aluno) {
+    if (aluno) {
       return (
         <div className="h-20 group relative">
           <div className={cn(
@@ -201,7 +126,7 @@ export function DeskCell({ cell, row, col, aluno, mode, onToggleType, onRemoveSt
 
     // ---- CARTEIRA VAZIA ----
     return (
-      <div className="h-20 cursor-pointer" onClick={() => !isMobiliar && onToggleType(row, col)}>
+      <div className="h-20 cursor-pointer" onClick={() => onToggleType(row, col)}>
         <div className={cn(
           'flex items-center justify-center rounded-t-lg rounded-b-sm h-[62px]',
           'bg-amber-50/70 border-2 border-dashed border-amber-200/80',
@@ -217,13 +142,18 @@ export function DeskCell({ cell, row, col, aluno, mode, onToggleType, onRemoveSt
 
   return (
     <div ref={setDropRef}>
-      <DraggableWrapper
-        id={`cell-${row}-${col}`}
-        data={{ row, col, cell, type: 'cell' }}
-        enabled={canDrag}
+      <div
+        ref={canDrag ? setDragRef : undefined}
+        style={dragStyle}
+        {...(canDrag ? listeners : {})}
+        {...(canDrag ? attributes : {})}
+        className={cn(
+          canDrag && 'cursor-grab active:cursor-grabbing',
+          isDragging && 'opacity-30'
+        )}
       >
         {content}
-      </DraggableWrapper>
+      </div>
     </div>
   )
 }

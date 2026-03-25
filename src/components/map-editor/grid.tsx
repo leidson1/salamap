@@ -3,17 +3,20 @@
 import { useCallback } from 'react'
 import { DeskCell } from './desk-cell'
 import { ClassroomFrame } from './classroom-frame'
-import type { Grid, Aluno, CellType } from '@/types/database'
+import type { Grid, Aluno, CellType, RoomConfig } from '@/types/database'
 
 interface MapGridProps {
   grid: Grid
   colunas: number
   alunos: Aluno[]
   mode: 'alunos' | 'mobiliar'
+  roomConfig?: RoomConfig | null
+  interactive?: boolean
   onGridChange: (grid: Grid) => void
+  onRoomConfigChange?: (config: RoomConfig) => void
 }
 
-export function MapGrid({ grid, colunas, alunos, mode, onGridChange }: MapGridProps) {
+export function MapGrid({ grid, colunas, alunos, mode, roomConfig, interactive, onGridChange, onRoomConfigChange }: MapGridProps) {
   const alunoMap = new Map(alunos.map((a) => [a.id, a]))
 
   const handleToggleType = useCallback(
@@ -22,13 +25,11 @@ export function MapGrid({ grid, colunas, alunos, mode, onGridChange }: MapGridPr
       const cell = newGrid[row][col]
 
       if (mode === 'mobiliar') {
-        // In mobiliar mode, clicking empty cell cycles through room elements
-        const cycle: CellType[] = ['vazio', 'carteira', 'bloqueado', 'porta', 'quadro', 'janela', 'professor']
+        const cycle: CellType[] = ['vazio', 'carteira', 'bloqueado', 'professor']
         const currentIdx = cycle.indexOf(cell.tipo)
         cell.tipo = cycle[(currentIdx + 1) % cycle.length]
         cell.alunoId = null
       } else {
-        // In alunos mode, only cycle desk types
         const cycle: CellType[] = ['carteira', 'vazio']
         const currentIdx = cycle.indexOf(cell.tipo)
         if (currentIdx >= 0) {
@@ -52,7 +53,7 @@ export function MapGrid({ grid, colunas, alunos, mode, onGridChange }: MapGridPr
   )
 
   return (
-    <ClassroomFrame>
+    <ClassroomFrame roomConfig={roomConfig} interactive={interactive} onRoomConfigChange={onRoomConfigChange}>
       <div
         className="grid gap-3"
         style={{

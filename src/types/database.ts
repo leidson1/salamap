@@ -26,7 +26,7 @@ export interface Aluno {
   created_at: string
 }
 
-export type CellType = 'carteira' | 'vazio' | 'bloqueado' | 'professor' | 'porta' | 'quadro' | 'janela'
+export type CellType = 'carteira' | 'vazio' | 'bloqueado' | 'professor'
 
 export interface GridCell {
   tipo: CellType
@@ -39,6 +39,7 @@ export interface RoomConfig {
   doorPosition: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
   windowWall: 'left' | 'right' | 'none'
   windowCount: number
+  boardWall: 'top' | 'bottom'
   boardLabel: string
 }
 
@@ -46,6 +47,7 @@ export const DEFAULT_ROOM_CONFIG: RoomConfig = {
   doorPosition: 'bottom-left',
   windowWall: 'left',
   windowCount: 3,
+  boardWall: 'top',
   boardLabel: 'Quadro',
 }
 

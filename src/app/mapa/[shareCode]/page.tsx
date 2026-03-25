@@ -78,6 +78,7 @@ export default async function PublicMapPage({ params }: PageProps) {
             grid={mapData.mapa.grid}
             colunas={mapData.mapa.colunas}
             alunoMap={alunoMap}
+            roomConfig={mapData.mapa.room_config}
           />
         </div>
 
