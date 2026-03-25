@@ -1,9 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useDroppable } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
-import { StudentCard } from './student-card'
 import { Search, UserRound } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import type { Aluno } from '@/types/database'
@@ -11,15 +9,12 @@ import type { Aluno } from '@/types/database'
 interface StudentSidebarProps {
   alunos: Aluno[]
   placedIds: number[]
+  selectedStudentId?: number | null
+  onSelectStudent?: (alunoId: number | null) => void
 }
 
-export function StudentSidebar({ alunos, placedIds }: StudentSidebarProps) {
+export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectStudent }: StudentSidebarProps) {
   const [search, setSearch] = useState('')
-
-  const { setNodeRef, isOver } = useDroppable({
-    id: 'sidebar-dropzone',
-    data: { type: 'sidebar' },
-  })
 
   const unplacedAlunos = alunos
     .filter((a) => !placedIds.includes(a.id))
@@ -33,14 +28,7 @@ export function StudentSidebar({ alunos, placedIds }: StudentSidebarProps) {
   const placedCount = alunos.filter((a) => placedIds.includes(a.id)).length
 
   return (
-    <div
-      ref={setNodeRef}
-      className={cn(
-        'flex flex-col rounded-lg border bg-white',
-        'w-full lg:w-72 lg:shrink-0',
-        isOver && 'ring-2 ring-red-300 bg-red-50/30'
-      )}
-    >
+    <div className="flex flex-col rounded-lg border bg-white w-full lg:w-72 lg:shrink-0">
       <div className="border-b p-3">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold">Alunos</h3>
@@ -57,6 +45,11 @@ export function StudentSidebar({ alunos, placedIds }: StudentSidebarProps) {
             className="pl-8 h-8 text-sm"
           />
         </div>
+        {selectedStudentId && (
+          <p className="mt-2 text-xs text-emerald-600 font-medium">
+            Clique em uma carteira vazia para posicionar
+          </p>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5 max-h-[calc(100vh-320px)] lg:max-h-[calc(100vh-280px)]">
@@ -73,7 +66,21 @@ export function StudentSidebar({ alunos, placedIds }: StudentSidebarProps) {
           </div>
         ) : (
           unplacedAlunos.map((aluno) => (
-            <StudentCard key={aluno.id} aluno={aluno} />
+            <div
+              key={aluno.id}
+              onClick={() => onSelectStudent?.(selectedStudentId === aluno.id ? null : aluno.id)}
+              className={cn(
+                'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-all select-none',
+                selectedStudentId === aluno.id
+                  ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-300 shadow-md'
+                  : 'bg-white hover:shadow-md hover:border-emerald-300'
+              )}
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
+                {aluno.numero ?? '?'}
+              </span>
+              <span className="truncate font-medium">{aluno.nome}</span>
+            </div>
           ))
         )}
       </div>
