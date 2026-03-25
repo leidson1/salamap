@@ -1,6 +1,5 @@
 'use client'
 
-
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -8,6 +7,16 @@ import { toast } from 'sonner'
 import { ArrowLeft, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
 import { MapGrid } from '@/components/map-editor/grid'
 import { StudentSidebar } from '@/components/map-editor/student-sidebar'
 import { Toolbar } from '@/components/map-editor/toolbar'
@@ -32,6 +41,16 @@ export default function MapaEditorPage() {
   const [layoutTipo, setLayoutTipo] = useState('tradicional')
   const [roomConfig, setRoomConfig] = useState<RoomConfig>(DEFAULT_ROOM_CONFIG)
   const [loading, setLoading] = useState(true)
+  const [activeDrag, setActiveDrag] = useState<Aluno | null>(null)
+
+  // DnD sensors
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: { distance: 5 },
+  })
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: { delay: 200, tolerance: 5 },
+  })
+  const sensors = useSensors(pointerSensor, touchSensor)
 
   const saveFn = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -100,7 +119,6 @@ export default function MapaEditorPage() {
           setLayoutTipo(m.layout_tipo)
           if (m.room_config) setRoomConfig(m.room_config)
         } else {
-          // No map yet, create default grid
           const defaultGrid = generateTradicional(5, 6)
           setGrid(defaultGrid)
         }
@@ -114,6 +132,87 @@ export default function MapaEditorPage() {
     loadData()
   }, [turmaId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // --- DnD handlers ---
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const data = event.active.data.current
+    if (data?.aluno) {
+      setActiveDrag(data.aluno)
+    }
+  }, [])
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      setActiveDrag(null)
+
+      const { active, over } = event
+      if (!over) return
+
+      const activeData = active.data.current
+      const overData = over.data.current
+      if (!activeData?.aluno) return
+
+      const draggedAluno = activeData.aluno as Aluno
+
+      // Dropping back to sidebar = remove from grid
+      if (overData?.type === 'sidebar') {
+        const newGrid = grid.map((row) =>
+          row.map((cell) =>
+            cell.alunoId === draggedAluno.id
+              ? { ...cell, alunoId: null }
+              : cell
+          )
+        )
+        setGrid(newGrid)
+        triggerSave()
+        return
+      }
+
+      // Dropping on a cell
+      if (overData?.row !== undefined && overData?.col !== undefined) {
+        const targetRow = overData.row as number
+        const targetCol = overData.col as number
+        const targetCell = grid[targetRow]?.[targetCol]
+
+        if (!targetCell) return
+        if (targetCell.tipo !== 'carteira' && targetCell.tipo !== 'vazio') return
+
+        const newGrid = grid.map((row) => row.map((cell) => ({ ...cell })))
+
+        // Remove aluno from old position
+        for (const row of newGrid) {
+          for (const cell of row) {
+            if (cell.alunoId === draggedAluno.id) {
+              cell.alunoId = null
+            }
+          }
+        }
+
+        // If target has a student, swap
+        const existingAlunoId = targetCell.alunoId
+        if (existingAlunoId !== null && activeData.source === 'grid') {
+          for (let r = 0; r < grid.length; r++) {
+            for (let c = 0; c < grid[r].length; c++) {
+              if (grid[r][c].alunoId === draggedAluno.id) {
+                newGrid[r][c].alunoId = existingAlunoId
+              }
+            }
+          }
+        }
+
+        // If target cell was 'vazio', convert to 'carteira'
+        if (newGrid[targetRow][targetCol].tipo === 'vazio') {
+          newGrid[targetRow][targetCol].tipo = 'carteira'
+        }
+
+        newGrid[targetRow][targetCol].alunoId = draggedAluno.id
+        setGrid(newGrid)
+        triggerSave()
+      }
+    },
+    [grid, triggerSave]
+  )
+
+  // --- Grid handlers ---
   const handleGridChange = useCallback(
     (newGrid: Grid) => {
       setGrid(newGrid)
@@ -261,22 +360,45 @@ export default function MapaEditorPage() {
         onPrintList={handlePrintList}
       />
 
-      {/* Editor area */}
-      <div className="flex flex-col lg:flex-row gap-4">
-        {/* Grid */}
-        <div className="flex-1 overflow-x-auto">
-          <MapGrid
-            grid={grid}
-            colunas={colunas}
-            alunos={alunos}
-            roomConfig={roomConfig}
-            onGridChange={handleGridChange}
-          />
+      {/* Editor area - DndContext wraps BOTH grid and sidebar */}
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Grid */}
+          <div className="flex-1 overflow-x-auto">
+            <MapGrid
+              grid={grid}
+              colunas={colunas}
+              alunos={alunos}
+              roomConfig={roomConfig}
+              onGridChange={handleGridChange}
+            />
+          </div>
+
+          {/* Student sidebar */}
+          <StudentSidebar alunos={alunos} placedIds={placedIds} />
         </div>
 
-        {/* Student sidebar */}
-        <StudentSidebar alunos={alunos} placedIds={placedIds} />
-      </div>
+        {/* Drag overlay - mini desk shape */}
+        <DragOverlay>
+          {activeDrag && (
+            <div className="pointer-events-none">
+              <div className="w-20 rounded-t-lg rounded-b-sm bg-amber-100 border-2 border-amber-400 px-2 py-1.5 shadow-2xl text-center">
+                <span className="flex h-5 w-5 mx-auto items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700">
+                  {activeDrag.numero ?? '?'}
+                </span>
+                <span className="text-[9px] font-medium block mt-0.5 truncate text-amber-900">
+                  {activeDrag.nome.split(' ')[0]}
+                </span>
+              </div>
+              <div className="w-5 h-2 bg-stone-400 rounded-b-full mx-auto" />
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
     </div>
   )
 }
