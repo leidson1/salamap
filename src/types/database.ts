@@ -6,32 +6,12 @@ export interface Profile {
   created_at: string
 }
 
-export interface Workspace {
-  id: number
-  nome: string
-  nome_instituicao: string | null
-  logo_url: string | null
-  created_by: string
-  created_at: string
-}
-
-export interface WorkspaceMember {
-  id: number
-  workspace_id: number
-  user_id: string
-  role: 'dono' | 'corretor'
-  created_at: string
-  workspace?: Workspace
-  profile?: Profile
-}
-
 export interface Turma {
   id: number
   user_id: string
-  workspace_id: number
   serie: string
   turma: string
-  turno: string | null
+  turno: string
   ativo: boolean
   created_at: string
 }
@@ -39,7 +19,6 @@ export interface Turma {
 export interface Aluno {
   id: number
   user_id: string
-  workspace_id: number
   turma_id: number
   nome: string
   numero: number | null
@@ -73,7 +52,6 @@ export const DEFAULT_ROOM_CONFIG: RoomConfig = {
 export interface Mapa {
   id: number
   user_id: string
-  workspace_id: number
   turma_id: number
   nome: string
   linhas: number

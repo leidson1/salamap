@@ -12,8 +12,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { useWorkspace } from '@/contexts/workspace-context'
-
 interface Stats {
   turmas: number
   alunos: number
@@ -31,7 +29,6 @@ interface RecentMap {
 
 export default function DashboardPage() {
   const supabase = createClient()
-  const { workspaceId } = useWorkspace()
   const [stats, setStats] = useState<Stats>({ turmas: 0, alunos: 0, mapas: 0, compartilhados: 0 })
   const [recentMaps, setRecentMaps] = useState<RecentMap[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,9 +39,9 @@ export default function DashboardPage() {
       if (!user) return
 
       const [turmasRes, alunosRes, mapasRes, sharesRes] = await Promise.all([
-        supabase.from('turmas').select('id', { count: 'exact' }).eq('workspace_id', workspaceId).eq('ativo', true),
-        supabase.from('alunos').select('id', { count: 'exact' }).eq('workspace_id', workspaceId).eq('ativo', true),
-        supabase.from('mapas').select('id', { count: 'exact' }).eq('workspace_id', workspaceId),
+        supabase.from('sala_turmas').select('id', { count: 'exact' }).eq('user_id', user.id).eq('ativo', true),
+        supabase.from('sala_alunos').select('id', { count: 'exact' }).eq('user_id', user.id).eq('ativo', true),
+        supabase.from('mapas').select('id', { count: 'exact' }).eq('user_id', user.id),
         supabase.from('mapa_compartilhamentos').select('id', { count: 'exact' }).eq('user_id', user.id).eq('ativo', true),
       ])
 
@@ -57,8 +54,8 @@ export default function DashboardPage() {
 
       const { data: maps } = await supabase
         .from('mapas')
-        .select('id, turma_id, nome, updated_at, turma:turmas(serie, turma, turno)')
-        .eq('workspace_id', workspaceId)
+        .select('id, turma_id, nome, updated_at, turma:sala_turmas(serie, turma, turno)')
+        .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
         .limit(5)
 

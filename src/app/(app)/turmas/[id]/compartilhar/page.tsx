@@ -36,7 +36,7 @@ export default function CompartilharPage() {
   const fetchData = useCallback(async () => {
     try {
       const [turmaRes, mapaRes] = await Promise.all([
-        supabase.from('turmas').select('*').eq('id', turmaId).single(),
+        supabase.from('sala_turmas').select('*').eq('id', turmaId).single(),
         supabase.from('mapas').select('*').eq('turma_id', turmaId).single(),
       ])
 

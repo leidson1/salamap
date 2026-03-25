@@ -26,7 +26,6 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useWorkspace } from '@/contexts/workspace-context'
 import type { Turma, Aluno } from '@/types/database'
 
 export default function AlunosPage() {
@@ -34,7 +33,6 @@ export default function AlunosPage() {
   const router = useRouter()
   const turmaId = Number(params.id)
   const supabase = createClient()
-  const { workspaceId } = useWorkspace()
 
   const [turma, setTurma] = useState<Turma | null>(null)
   const [alunos, setAlunos] = useState<Aluno[]>([])
@@ -52,9 +50,9 @@ export default function AlunosPage() {
   const fetchData = useCallback(async () => {
     try {
       const [turmaRes, alunosRes] = await Promise.all([
-        supabase.from('turmas').select('*').eq('id', turmaId).single(),
+        supabase.from('sala_turmas').select('*').eq('id', turmaId).single(),
         supabase
-          .from('alunos')
+          .from('sala_alunos')
           .select('*')
           .eq('turma_id', turmaId)
           .eq('ativo', true)
@@ -107,7 +105,7 @@ export default function AlunosPage() {
 
       if (editingAluno) {
         const { error } = await supabase
-          .from('alunos')
+          .from('sala_alunos')
           .update({ nome: nome.trim(), numero: num })
           .eq('id', editingAluno.id)
 
@@ -118,13 +116,13 @@ export default function AlunosPage() {
         if (!user) throw new Error('Usuario nao autenticado.')
 
         const { error } = await supabase
-          .from('alunos')
+          .from('sala_alunos')
           .insert({
             nome: nome.trim(),
             numero: num,
             turma_id: turmaId,
             user_id: user.id,
-            workspace_id: workspaceId,
+
           })
 
         if (error) throw error
@@ -149,7 +147,7 @@ export default function AlunosPage() {
     setSaving(true)
     try {
       const { error } = await supabase
-        .from('alunos')
+        .from('sala_alunos')
         .update({ ativo: false })
         .eq('id', deletingAluno.id)
 
@@ -190,7 +188,7 @@ export default function AlunosPage() {
             numero: parseInt(match[1]),
             turma_id: turmaId,
             user_id: user.id,
-            workspace_id: workspaceId,
+
           }
         }
         return {
@@ -198,11 +196,10 @@ export default function AlunosPage() {
           numero: idx + 1,
           turma_id: turmaId,
           user_id: user.id,
-          workspace_id: workspaceId,
         }
       })
 
-      const { error } = await supabase.from('alunos').insert(records)
+      const { error } = await supabase.from('sala_alunos').insert(records)
       if (error) throw error
 
       toast.success(`${records.length} alunos importados com sucesso!`)

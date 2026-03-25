@@ -1,21 +1,54 @@
 -- ============================================
--- MapaSala - Tabelas ADICIONAIS ao banco do ProvasCan
--- Rodar no mesmo projeto Supabase do ProvasCan
--- As tabelas profiles, turmas, alunos JA EXISTEM
+-- SalaMap - Schema Supabase
+-- Roda no MESMO projeto Supabase do ProvasCan
+-- Compartilha: profiles (auth)
+-- Independente: sala_turmas, sala_alunos, mapas
 -- ============================================
 
--- MAPAS (nova tabela - mapa de sala por turma)
+-- SALA_TURMAS (turmas independentes do SalaMap)
+CREATE TABLE sala_turmas (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  serie TEXT NOT NULL,
+  turma TEXT NOT NULL,
+  turno TEXT NOT NULL DEFAULT 'Manha',
+  ativo BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE sala_turmas ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can CRUD own sala_turmas" ON sala_turmas
+  FOR ALL USING (auth.uid() = user_id);
+
+-- SALA_ALUNOS (alunos independentes do SalaMap)
+CREATE TABLE sala_alunos (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  turma_id BIGINT NOT NULL REFERENCES sala_turmas(id) ON DELETE CASCADE,
+  nome TEXT NOT NULL,
+  numero INT,
+  ativo BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE sala_alunos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can CRUD own sala_alunos" ON sala_alunos
+  FOR ALL USING (auth.uid() = user_id);
+
+-- MAPAS (mapa de sala por turma)
 CREATE TABLE mapas (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  workspace_id BIGINT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  turma_id BIGINT NOT NULL REFERENCES turmas(id) ON DELETE CASCADE,
+  turma_id BIGINT NOT NULL REFERENCES sala_turmas(id) ON DELETE CASCADE,
   nome TEXT NOT NULL DEFAULT 'Mapa de Sala',
   linhas INT NOT NULL DEFAULT 5,
   colunas INT NOT NULL DEFAULT 6,
   layout_tipo TEXT NOT NULL DEFAULT 'tradicional',
   grid JSONB NOT NULL DEFAULT '[]'::jsonb,
   mesa_professor JSONB,
+  room_config JSONB,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(turma_id)
@@ -26,7 +59,7 @@ ALTER TABLE mapas ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can CRUD own mapas" ON mapas
   FOR ALL USING (auth.uid() = user_id);
 
--- MAPA_COMPARTILHAMENTOS (nova tabela - links de compartilhamento)
+-- MAPA_COMPARTILHAMENTOS (links de compartilhamento)
 CREATE TABLE mapa_compartilhamentos (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   mapa_id BIGINT NOT NULL REFERENCES mapas(id) ON DELETE CASCADE,
@@ -44,7 +77,7 @@ CREATE POLICY "Users can CRUD own compartilhamentos" ON mapa_compartilhamentos
 CREATE POLICY "Anyone can read active shares" ON mapa_compartilhamentos
   FOR SELECT USING (ativo = TRUE);
 
--- MAPA_HISTORICO (nova tabela - snapshots automaticos)
+-- MAPA_HISTORICO (snapshots automaticos)
 CREATE TABLE mapa_historico (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   mapa_id BIGINT NOT NULL REFERENCES mapas(id) ON DELETE CASCADE,
@@ -111,13 +144,13 @@ BEGIN
         jsonb_build_object('id', a.id, 'nome', a.nome, 'numero', a.numero)
         ORDER BY a.numero
       ), '[]'::jsonb)
-      FROM alunos a
+      FROM sala_alunos a
       WHERE a.turma_id = t.id AND a.ativo = TRUE
     )
   ) INTO result
   FROM mapa_compartilhamentos mc
   JOIN mapas m ON m.id = mc.mapa_id
-  JOIN turmas t ON t.id = m.turma_id
+  JOIN sala_turmas t ON t.id = m.turma_id
   JOIN profiles p ON p.id = m.user_id
   WHERE mc.share_code = p_share_code
     AND mc.ativo = TRUE;

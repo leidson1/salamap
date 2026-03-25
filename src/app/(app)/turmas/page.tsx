@@ -27,8 +27,6 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { useWorkspace } from '@/contexts/workspace-context'
-
 interface TurmaRow {
   id: number
   serie: string
@@ -44,7 +42,6 @@ const TURNOS = ['Manha', 'Tarde', 'Integral', 'Noite'] as const
 
 export default function TurmasPage() {
   const supabase = createClient()
-  const { workspaceId } = useWorkspace()
   const [turmas, setTurmas] = useState<TurmaRow[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -58,10 +55,13 @@ export default function TurmasPage() {
 
   const fetchTurmas = useCallback(async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
       const { data, error } = await supabase
-        .from('turmas')
-        .select('*, alunos(count), mapas(id)')
-        .eq('workspace_id', workspaceId)
+        .from('sala_turmas')
+        .select('*, sala_alunos(count), mapas(id)')
+        .eq('user_id', user.id)
         .eq('ativo', true)
         .order('serie')
         .order('turma')
@@ -73,7 +73,7 @@ export default function TurmasPage() {
     } finally {
       setLoading(false)
     }
-  }, [workspaceId])
+  }, [])
 
   useEffect(() => {
     fetchTurmas()
@@ -118,7 +118,7 @@ export default function TurmasPage() {
     try {
       if (editingTurma) {
         const { error } = await supabase
-          .from('turmas')
+          .from('sala_turmas')
           .update({ serie: serie.trim(), turma: turma.trim(), turno })
           .eq('id', editingTurma.id)
 
@@ -129,8 +129,8 @@ export default function TurmasPage() {
         if (!user) throw new Error('Usuario nao autenticado.')
 
         const { error } = await supabase
-          .from('turmas')
-          .insert({ serie: serie.trim(), turma: turma.trim(), turno, user_id: user.id, workspace_id: workspaceId })
+          .from('sala_turmas')
+          .insert({ serie: serie.trim(), turma: turma.trim(), turno, user_id: user.id })
 
         if (error) throw error
         toast.success('Turma criada com sucesso.')
@@ -155,7 +155,7 @@ export default function TurmasPage() {
     setSaving(true)
     try {
       const { error } = await supabase
-        .from('turmas')
+        .from('sala_turmas')
         .update({ ativo: false })
         .eq('id', deletingTurma.id)
 

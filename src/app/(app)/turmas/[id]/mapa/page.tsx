@@ -14,7 +14,6 @@ import { Toolbar } from '@/components/map-editor/toolbar'
 import { useAutoSave } from '@/hooks/use-auto-save'
 import { generateTradicional, generateU, generateGrupos, clearStudentsFromGrid } from '@/lib/map/presets'
 import { resizeGrid, getPlacedStudentIds } from '@/lib/map/utils'
-import { useWorkspace } from '@/contexts/workspace-context'
 import type { Turma, Aluno, Grid, Mapa, RoomConfig } from '@/types/database'
 import { DEFAULT_ROOM_CONFIG } from '@/types/database'
 
@@ -23,7 +22,6 @@ export default function MapaEditorPage() {
   const router = useRouter()
   const turmaId = Number(params.id)
   const supabase = createClient()
-  const { workspaceId } = useWorkspace()
 
   const [turma, setTurma] = useState<Turma | null>(null)
   const [alunos, setAlunos] = useState<Aluno[]>([])
@@ -57,7 +55,6 @@ export default function MapaEditorPage() {
         .from('mapas')
         .insert({
           user_id: user.id,
-          workspace_id: workspaceId,
           turma_id: turmaId,
           grid: JSON.parse(JSON.stringify(grid)),
           linhas,
@@ -79,9 +76,9 @@ export default function MapaEditorPage() {
     async function loadData() {
       try {
         const [turmaRes, alunosRes, mapaRes] = await Promise.all([
-          supabase.from('turmas').select('*').eq('id', turmaId).single(),
+          supabase.from('sala_turmas').select('*').eq('id', turmaId).single(),
           supabase
-            .from('alunos')
+            .from('sala_alunos')
             .select('*')
             .eq('turma_id', turmaId)
             .eq('ativo', true)
