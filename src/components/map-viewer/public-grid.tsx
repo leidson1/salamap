@@ -1,15 +1,14 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { User, Ban } from 'lucide-react'
+import { User, Ban, DoorOpen, PanelTop, Square } from 'lucide-react'
 import { ClassroomFrame } from '@/components/map-editor/classroom-frame'
-import type { Grid, RoomConfig } from '@/types/database'
+import type { Grid } from '@/types/database'
 
 interface PublicGridProps {
   grid: Grid
   colunas: number
   alunoMap: Map<number, { nome: string; numero: number | null }>
-  roomConfig?: RoomConfig | null
 }
 
 function MiniChair({ muted = false }: { muted?: boolean }) {
@@ -21,9 +20,9 @@ function MiniChair({ muted = false }: { muted?: boolean }) {
   )
 }
 
-export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridProps) {
+export function PublicGrid({ grid, colunas, alunoMap }: PublicGridProps) {
   return (
-    <ClassroomFrame roomConfig={roomConfig} compact>
+    <ClassroomFrame compact>
       <div
         className="grid gap-1.5 sm:gap-2"
         style={{
@@ -33,20 +32,51 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
         {grid.map((row, rIdx) =>
           row.map((cell, cIdx) => {
             if (cell.tipo === 'vazio') {
+              return <div key={`${rIdx}-${cIdx}`} className="h-14 sm:h-16" />
+            }
+
+            if (cell.tipo === 'porta') {
               return (
-                <div
-                  key={`${rIdx}-${cIdx}`}
-                  className="h-14 sm:h-16"
-                />
+                <div key={`${rIdx}-${cIdx}`} className="h-14 sm:h-16">
+                  <div className="flex items-center justify-center rounded-md h-[42px] sm:h-[50px] bg-amber-700/15 border border-amber-700/40">
+                    <div className="text-center">
+                      <DoorOpen className="size-3.5 text-amber-700 mx-auto" />
+                      <span className="text-[7px] font-bold text-amber-700">Porta</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            if (cell.tipo === 'quadro') {
+              return (
+                <div key={`${rIdx}-${cIdx}`} className="h-14 sm:h-16">
+                  <div className="flex items-center justify-center rounded-md h-[42px] sm:h-[50px] bg-white border-2 border-stone-300">
+                    <div className="text-center">
+                      <PanelTop className="size-3.5 text-stone-500 mx-auto" />
+                      <span className="text-[7px] font-bold text-stone-500">Quadro</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            if (cell.tipo === 'janela') {
+              return (
+                <div key={`${rIdx}-${cIdx}`} className="h-14 sm:h-16">
+                  <div className="flex items-center justify-center rounded-md h-[42px] sm:h-[50px] bg-sky-100/80 border border-sky-400/60">
+                    <div className="text-center">
+                      <Square className="size-3.5 text-sky-500 mx-auto" />
+                      <span className="text-[7px] font-bold text-sky-500">Janela</span>
+                    </div>
+                  </div>
+                </div>
               )
             }
 
             if (cell.tipo === 'bloqueado') {
               return (
-                <div
-                  key={`${rIdx}-${cIdx}`}
-                  className="flex items-center justify-center rounded-md bg-stone-200/50 blocked-stripes h-14 sm:h-16"
-                >
+                <div key={`${rIdx}-${cIdx}`} className="flex items-center justify-center rounded-md bg-stone-200/50 blocked-stripes h-14 sm:h-16">
                   <Ban className="size-3 text-stone-400" />
                 </div>
               )
@@ -66,19 +96,17 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
               )
             }
 
+            // carteira
             const aluno = cell.alunoId ? alunoMap.get(cell.alunoId) : null
-
             return (
               <div key={`${rIdx}-${cIdx}`} className="h-14 sm:h-16">
-                <div
-                  className={cn(
-                    'flex items-center justify-center rounded-t-md rounded-b-sm px-1 text-center',
-                    'h-[42px] sm:h-[50px]',
-                    aluno
-                      ? 'bg-amber-100 border-2 border-amber-300 shadow-sm'
-                      : 'bg-amber-50/50 border border-dashed border-amber-200/60'
-                  )}
-                >
+                <div className={cn(
+                  'flex items-center justify-center rounded-t-md rounded-b-sm px-1 text-center',
+                  'h-[42px] sm:h-[50px]',
+                  aluno
+                    ? 'bg-amber-100 border-2 border-amber-300 shadow-sm'
+                    : 'bg-amber-50/50 border border-dashed border-amber-200/60'
+                )}>
                   {aluno ? (
                     <div className="truncate">
                       <span className="text-[10px] sm:text-xs font-bold text-amber-700 block">

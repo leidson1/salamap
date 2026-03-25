@@ -26,7 +26,7 @@ export interface Aluno {
   created_at: string
 }
 
-export type CellType = 'carteira' | 'vazio' | 'bloqueado' | 'professor'
+export type CellType = 'carteira' | 'vazio' | 'bloqueado' | 'professor' | 'porta' | 'quadro' | 'janela'
 
 export interface GridCell {
   tipo: CellType

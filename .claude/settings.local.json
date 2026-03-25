@@ -11,7 +11,8 @@
       "Bash(gh repo:*)",
       "WebSearch",
       "WebFetch(domain:seatingchartmaker.app)",
-      "WebFetch(domain:www.101planners.com)"
+      "WebFetch(domain:www.101planners.com)",
+      "Bash(npm ls:*)"
     ]
   }
 }
