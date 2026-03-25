@@ -25,7 +25,7 @@ export function MapGrid({ grid, colunas, alunos, mode, roomConfig, interactive, 
       const cell = newGrid[row][col]
 
       if (mode === 'mobiliar') {
-        const cycle: CellType[] = ['vazio', 'carteira', 'bloqueado', 'professor']
+        const cycle: CellType[] = ['vazio', 'carteira', 'bloqueado']
         const currentIdx = cycle.indexOf(cell.tipo)
         cell.tipo = cycle[(currentIdx + 1) % cycle.length]
         cell.alunoId = null

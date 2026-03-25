@@ -3,8 +3,8 @@
 import { useDroppable, useDraggable } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
 import { StudentCard } from './student-card'
-import { X, User, Ban } from 'lucide-react'
-import type { GridCell, Aluno, CellType } from '@/types/database'
+import { X, Ban } from 'lucide-react'
+import type { GridCell, Aluno } from '@/types/database'
 
 interface DeskCellProps {
   cell: GridCell
@@ -70,24 +70,6 @@ export function DeskCell({ cell, row, col, aluno, mode, onToggleType, onRemoveSt
           )}
         >
           <Ban className="size-4 text-stone-400" />
-        </div>
-      )
-    }
-
-    // ---- PROFESSOR ----
-    if (cell.tipo === 'professor') {
-      return (
-        <div className="h-20" onClick={() => isMobiliar && onToggleType(row, col)}>
-          <div className={cn(
-            'flex items-center justify-center rounded-lg bg-sky-100 border-2 border-sky-400 h-[62px] shadow-md transition-shadow',
-            isOver && 'ring-2 ring-emerald-400'
-          )}>
-            <div className="text-center">
-              <User className="size-4 text-sky-600 mx-auto" />
-              <span className="text-[10px] font-bold text-sky-700">Professor</span>
-            </div>
-          </div>
-          <div className="w-8 h-2 rounded-b-full mx-auto -mt-0.5 bg-sky-300" />
         </div>
       )
     }

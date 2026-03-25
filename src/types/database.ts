@@ -26,7 +26,7 @@ export interface Aluno {
   created_at: string
 }
 
-export type CellType = 'carteira' | 'vazio' | 'bloqueado' | 'professor'
+export type CellType = 'carteira' | 'vazio' | 'bloqueado'
 
 export interface GridCell {
   tipo: CellType
@@ -35,20 +35,32 @@ export interface GridCell {
 
 export type Grid = GridCell[][]
 
+export type WallSide = 'top' | 'bottom' | 'left' | 'right'
+
+export interface WallElement {
+  id: string
+  type: 'porta' | 'janela'
+  wall: WallSide
+  position: number // 0-100 (percentage along the wall)
+}
+
 export interface RoomConfig {
-  doorPosition: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
-  windowWall: 'left' | 'right' | 'none'
-  windowCount: number
   boardWall: 'top' | 'bottom'
   boardLabel: string
+  teacherDesk: 'left' | 'center' | 'right' | 'none'
+  wallElements: WallElement[]
 }
 
 export const DEFAULT_ROOM_CONFIG: RoomConfig = {
-  doorPosition: 'bottom-left',
-  windowWall: 'left',
-  windowCount: 3,
   boardWall: 'top',
   boardLabel: 'Quadro',
+  teacherDesk: 'center',
+  wallElements: [
+    { id: 'porta-1', type: 'porta', wall: 'bottom', position: 10 },
+    { id: 'janela-1', type: 'janela', wall: 'left', position: 25 },
+    { id: 'janela-2', type: 'janela', wall: 'left', position: 50 },
+    { id: 'janela-3', type: 'janela', wall: 'left', position: 75 },
+  ],
 }
 
 export interface Mapa {

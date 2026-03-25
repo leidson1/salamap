@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { User, Ban } from 'lucide-react'
+import { Ban } from 'lucide-react'
 import { ClassroomFrame } from '@/components/map-editor/classroom-frame'
 import type { Grid, RoomConfig } from '@/types/database'
 
@@ -40,20 +40,6 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
               return (
                 <div key={`${rIdx}-${cIdx}`} className="flex items-center justify-center rounded-md bg-stone-200/50 blocked-stripes h-14 sm:h-16">
                   <Ban className="size-3 text-stone-400" />
-                </div>
-              )
-            }
-
-            if (cell.tipo === 'professor') {
-              return (
-                <div key={`${rIdx}-${cIdx}`} className="h-14 sm:h-16">
-                  <div className="flex items-center justify-center rounded-md bg-sky-100 border border-sky-400 h-[42px] sm:h-[50px] shadow-sm">
-                    <div className="text-center">
-                      <User className="size-3 text-sky-600 mx-auto" />
-                      <span className="text-[8px] font-bold text-sky-700">Prof.</span>
-                    </div>
-                  </div>
-                  <div className="w-5 h-1.5 rounded-b-full mx-auto -mt-px bg-sky-300/80" />
                 </div>
               )
             }

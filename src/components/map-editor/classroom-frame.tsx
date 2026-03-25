@@ -1,6 +1,8 @@
 'use client'
 
-import type { RoomConfig } from '@/types/database'
+import { User, DoorOpen, Plus, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import type { RoomConfig, WallElement, WallSide } from '@/types/database'
 import { DEFAULT_ROOM_CONFIG } from '@/types/database'
 
 interface ClassroomFrameProps {
@@ -11,6 +13,135 @@ interface ClassroomFrameProps {
   onRoomConfigChange?: (config: RoomConfig) => void
 }
 
+function WallElementIcon({ el, compact, interactive, onRemove }: {
+  el: WallElement
+  compact?: boolean
+  interactive?: boolean
+  onRemove?: () => void
+}) {
+  const size = compact ? 'w-7 h-7' : 'w-9 h-9'
+
+  if (el.type === 'porta') {
+    return (
+      <div className={`${size} bg-amber-800/25 border-2 border-amber-700/50 rounded flex items-center justify-center relative group ${interactive ? 'cursor-move' : ''}`}>
+        <DoorOpen className={compact ? 'size-3' : 'size-4'} style={{ color: '#92400e' }} />
+        {interactive && onRemove && (
+          <button onClick={(e) => { e.stopPropagation(); onRemove() }}
+            className="absolute -top-1 -right-1 hidden group-hover:flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-white text-[8px]">
+            <X className="size-2" />
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  // janela
+  return (
+    <div className={`${size} bg-sky-200/80 border-2 border-sky-400/70 rounded-sm relative group ${interactive ? 'cursor-move' : ''}`}>
+      {interactive && onRemove && (
+        <button onClick={(e) => { e.stopPropagation(); onRemove() }}
+          className="absolute -top-1 -right-1 hidden group-hover:flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-white text-[8px]">
+          <X className="size-2" />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function AddButton({ onClick, compact }: { onClick: () => void; compact?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`${compact ? 'w-5 h-5' : 'w-7 h-7'} border-2 border-dashed border-stone-300 rounded flex items-center justify-center hover:border-stone-400 hover:bg-stone-100 transition-colors`}
+    >
+      <Plus className={compact ? 'size-2.5' : 'size-3'} style={{ color: '#a8a29e' }} />
+    </button>
+  )
+}
+
+function TeacherArea({ position, compact, interactive, onPositionChange }: {
+  position: string
+  compact?: boolean
+  interactive?: boolean
+  onPositionChange?: (pos: 'left' | 'center' | 'right' | 'none') => void
+}) {
+  if (position === 'none') {
+    if (!interactive) return null
+    return (
+      <div className="flex justify-center py-2">
+        <button
+          onClick={() => onPositionChange?.('center')}
+          className="text-[10px] text-muted-foreground border border-dashed rounded px-3 py-1 hover:bg-muted/50 transition-colors"
+        >
+          + Adicionar mesa do professor
+        </button>
+      </div>
+    )
+  }
+
+  const justifyClass = position === 'left' ? 'justify-start' : position === 'right' ? 'justify-end' : 'justify-center'
+  const cycle = () => {
+    if (!interactive || !onPositionChange) return
+    const positions: Array<'left' | 'center' | 'right' | 'none'> = ['left', 'center', 'right', 'none']
+    const idx = positions.indexOf(position as 'left' | 'center' | 'right')
+    onPositionChange(positions[(idx + 1) % positions.length])
+  }
+
+  return (
+    <div className={`flex ${justifyClass} ${compact ? 'py-1.5 px-2' : 'py-2.5 px-4'}`}>
+      <div
+        onClick={cycle}
+        className={cn(
+          'flex items-center gap-2 rounded-lg border-2 shadow-sm',
+          compact ? 'px-3 py-1.5' : 'px-5 py-2.5',
+          'bg-sky-50 border-sky-300',
+          interactive && 'cursor-pointer hover:shadow-md hover:border-sky-400 transition-all'
+        )}
+        title={interactive ? 'Clique para mudar posicao da mesa' : undefined}
+      >
+        <User className={compact ? 'size-3.5 text-sky-600' : 'size-5 text-sky-600'} />
+        <span className={`${compact ? 'text-[9px]' : 'text-xs'} font-bold text-sky-700`}>Mesa do Professor</span>
+      </div>
+    </div>
+  )
+}
+
+function WallWithElements({ wall, elements, compact, interactive, onAdd, onRemove }: {
+  wall: WallSide
+  elements: WallElement[]
+  compact?: boolean
+  interactive?: boolean
+  onAdd?: (wall: WallSide, type: 'porta' | 'janela') => void
+  onRemove?: (id: string) => void
+}) {
+  const isHorizontal = wall === 'top' || wall === 'bottom'
+  const sorted = [...elements].sort((a, b) => a.position - b.position)
+
+  return (
+    <div className={cn(
+      'flex items-center gap-1.5',
+      isHorizontal ? 'flex-row justify-center' : 'flex-col justify-center',
+      compact ? 'p-1' : 'p-1.5'
+    )}>
+      {sorted.map(el => (
+        <WallElementIcon
+          key={el.id}
+          el={el}
+          compact={compact}
+          interactive={interactive}
+          onRemove={interactive && onRemove ? () => onRemove(el.id) : undefined}
+        />
+      ))}
+      {interactive && onAdd && (
+        <div className={cn('flex gap-1', isHorizontal ? 'flex-row' : 'flex-col')}>
+          <AddButton compact={compact} onClick={() => onAdd(wall, 'porta')} />
+          <AddButton compact={compact} onClick={() => onAdd(wall, 'janela')} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ClassroomFrame({
   roomConfig,
   children,
@@ -19,105 +150,176 @@ export function ClassroomFrame({
   onRoomConfigChange,
 }: ClassroomFrameProps) {
   const config = roomConfig ?? DEFAULT_ROOM_CONFIG
-  const windowCount = Math.max(0, Math.min(5, config.windowCount))
+  const wallElements = config.wallElements ?? []
 
-  const cycleBoard = () => {
-    if (!interactive || !onRoomConfigChange) return
-    const walls: Array<RoomConfig['boardWall']> = ['top', 'bottom']
-    const idx = walls.indexOf(config.boardWall)
-    onRoomConfigChange({ ...config, boardWall: walls[(idx + 1) % walls.length] })
+  const getWallElements = (wall: WallSide) => wallElements.filter(e => e.wall === wall)
+
+  const handleAdd = (wall: WallSide, type: 'porta' | 'janela') => {
+    if (!onRoomConfigChange) return
+    const id = `${type}-${Date.now()}`
+    const position = Math.random() * 80 + 10
+    onRoomConfigChange({
+      ...config,
+      wallElements: [...wallElements, { id, type, wall, position }],
+    })
   }
 
-  const cycleDoor = () => {
-    if (!interactive || !onRoomConfigChange) return
-    const positions: Array<RoomConfig['doorPosition']> = ['bottom-left', 'bottom-right', 'top-left', 'top-right']
-    const idx = positions.indexOf(config.doorPosition)
-    onRoomConfigChange({ ...config, doorPosition: positions[(idx + 1) % positions.length] })
+  const handleRemove = (id: string) => {
+    if (!onRoomConfigChange) return
+    onRoomConfigChange({
+      ...config,
+      wallElements: wallElements.filter(e => e.id !== id),
+    })
   }
 
-  const cycleWindows = () => {
-    if (!interactive || !onRoomConfigChange) return
-    const walls: Array<RoomConfig['windowWall']> = ['left', 'right', 'none']
-    const idx = walls.indexOf(config.windowWall)
-    onRoomConfigChange({ ...config, windowWall: walls[(idx + 1) % walls.length] })
+  const handleTeacherPos = (pos: 'left' | 'center' | 'right' | 'none') => {
+    if (!onRoomConfigChange) return
+    onRoomConfigChange({ ...config, teacherDesk: pos })
   }
 
-  const boardSize = compact ? 'h-5' : 'h-7'
-  const doorW = compact ? 'w-10' : 'w-14'
-  const doorH = compact ? 'h-6' : 'h-8'
+  const handleBoardCycle = () => {
+    if (!interactive || !onRoomConfigChange) return
+    onRoomConfigChange({
+      ...config,
+      boardWall: config.boardWall === 'top' ? 'bottom' : 'top',
+    })
+  }
 
-  // Door position classes
-  const doorIsTop = config.doorPosition.startsWith('top')
-  const doorIsLeft = config.doorPosition.endsWith('left')
+  const wallThickness = compact ? 'min-h-[32px] min-w-[32px]' : 'min-h-[44px] min-w-[44px]'
+  const boardAtTop = config.boardWall === 'top'
 
   return (
-    <div className="relative classroom-floor bg-amber-50/50 border-[5px] border-stone-400 rounded-xl shadow-inner">
+    <div className="classroom-floor bg-amber-50/50 rounded-xl shadow-inner overflow-hidden">
+      {/* === LAYOUT: top wall, content, bottom wall with left/right walls === */}
+      <div className="flex flex-col">
 
-      {/* ===== QUADRO (whiteboard) ===== */}
-      <div
-        className={`absolute ${config.boardWall === 'top' ? 'top-0 -translate-y-1/2' : 'bottom-0 translate-y-1/2'} left-1/2 -translate-x-1/2 z-10`}
-        onClick={cycleBoard}
-        title={interactive ? 'Clique para mudar parede do quadro' : undefined}
-      >
-        <div className={`${boardSize} px-8 sm:px-14 bg-white border-2 border-stone-300 rounded shadow-sm flex items-center justify-center ${interactive ? 'cursor-pointer hover:border-stone-400 hover:shadow-md transition-all' : ''}`}>
-          <span className={`${compact ? 'text-[7px]' : 'text-[9px]'} font-semibold text-stone-400 tracking-widest uppercase`}>
-            {config.boardLabel}
-          </span>
+        {/* TOP WALL */}
+        <div className={cn(
+          'bg-stone-300/60 border-b-4 border-stone-400 flex items-center justify-center gap-2',
+          wallThickness
+        )}>
+          {boardAtTop && (
+            <div
+              onClick={handleBoardCycle}
+              className={cn(
+                'bg-white border-2 border-stone-400 rounded shadow-sm flex items-center justify-center',
+                compact ? 'h-5 px-8' : 'h-7 px-16',
+                interactive && 'cursor-pointer hover:shadow-md hover:border-stone-500 transition-all'
+              )}
+              title={interactive ? 'Clique para mover quadro' : undefined}
+            >
+              <span className={`${compact ? 'text-[7px]' : 'text-[10px]'} font-bold text-stone-500 tracking-widest uppercase`}>
+                {config.boardLabel}
+              </span>
+            </div>
+          )}
+          <WallWithElements
+            wall="top"
+            elements={getWallElements('top')}
+            compact={compact}
+            interactive={interactive}
+            onAdd={handleAdd}
+            onRemove={handleRemove}
+          />
         </div>
-      </div>
 
-      {/* ===== PORTA (door) ===== */}
-      <div
-        className={`absolute z-10 ${doorIsTop ? 'top-0 -translate-y-1/2' : 'bottom-0 translate-y-1/2'} ${doorIsLeft ? 'left-4 sm:left-6' : 'right-4 sm:right-6'}`}
-        onClick={cycleDoor}
-        title={interactive ? 'Clique para mudar posicao da porta' : undefined}
-      >
-        <div className={`${doorW} ${doorH} bg-amber-800/20 border-2 border-amber-700/50 rounded flex items-center justify-center ${interactive ? 'cursor-pointer hover:bg-amber-800/30 hover:border-amber-700 transition-all' : ''}`}>
-          <div className="text-center">
-            <svg className={`${compact ? 'w-3 h-3' : 'w-4 h-4'} mx-auto text-amber-800`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 21V3h12l6 3v15H3z" />
-              <circle cx="15" cy="12" r="1" fill="currentColor" />
-            </svg>
-            <span className={`${compact ? 'text-[6px]' : 'text-[8px]'} font-bold text-amber-800 block`}>Porta</span>
+        {/* MIDDLE: left wall + content + right wall */}
+        <div className="flex">
+          {/* LEFT WALL */}
+          <div className={cn(
+            'bg-stone-300/60 border-r-4 border-stone-400 flex flex-col items-center justify-center',
+            wallThickness
+          )}>
+            <WallWithElements
+              wall="left"
+              elements={getWallElements('left')}
+              compact={compact}
+              interactive={interactive}
+              onAdd={handleAdd}
+              onRemove={handleRemove}
+            />
+          </div>
+
+          {/* INTERIOR */}
+          <div className="flex-1 flex flex-col">
+            {/* Teacher area (after board) */}
+            {boardAtTop && (
+              <TeacherArea
+                position={config.teacherDesk}
+                compact={compact}
+                interactive={interactive}
+                onPositionChange={handleTeacherPos}
+              />
+            )}
+
+            {/* Separator line */}
+            {boardAtTop && config.teacherDesk !== 'none' && (
+              <div className={`mx-4 border-t border-dashed border-stone-300 ${compact ? 'mb-1' : 'mb-2'}`} />
+            )}
+
+            {/* Student grid */}
+            <div className={compact ? 'p-2' : 'p-3 sm:p-4'}>
+              {children}
+            </div>
+
+            {/* Teacher area (if board at bottom) */}
+            {!boardAtTop && config.teacherDesk !== 'none' && (
+              <div className={`mx-4 border-t border-dashed border-stone-300 ${compact ? 'mt-1' : 'mt-2'}`} />
+            )}
+            {!boardAtTop && (
+              <TeacherArea
+                position={config.teacherDesk}
+                compact={compact}
+                interactive={interactive}
+                onPositionChange={handleTeacherPos}
+              />
+            )}
+          </div>
+
+          {/* RIGHT WALL */}
+          <div className={cn(
+            'bg-stone-300/60 border-l-4 border-stone-400 flex flex-col items-center justify-center',
+            wallThickness
+          )}>
+            <WallWithElements
+              wall="right"
+              elements={getWallElements('right')}
+              compact={compact}
+              interactive={interactive}
+              onAdd={handleAdd}
+              onRemove={handleRemove}
+            />
           </div>
         </div>
-      </div>
 
-      {/* ===== JANELAS (windows) - left wall ===== */}
-      {config.windowWall === 'left' && windowCount > 0 && (
-        <div
-          className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col z-10 ${compact ? 'gap-2' : 'gap-3'}`}
-          onClick={cycleWindows}
-          title={interactive ? 'Clique para mudar parede das janelas' : undefined}
-        >
-          {Array.from({ length: windowCount }).map((_, i) => (
+        {/* BOTTOM WALL */}
+        <div className={cn(
+          'bg-stone-300/60 border-t-4 border-stone-400 flex items-center justify-center gap-2',
+          wallThickness
+        )}>
+          {!boardAtTop && (
             <div
-              key={i}
-              className={`${compact ? 'w-3 h-7' : 'w-3.5 h-9'} bg-sky-200/80 border-2 border-sky-400/70 rounded-sm shadow-sm ${interactive ? 'cursor-pointer hover:bg-sky-300/80 transition-colors' : ''}`}
-            />
-          ))}
+              onClick={handleBoardCycle}
+              className={cn(
+                'bg-white border-2 border-stone-400 rounded shadow-sm flex items-center justify-center',
+                compact ? 'h-5 px-8' : 'h-7 px-16',
+                interactive && 'cursor-pointer hover:shadow-md hover:border-stone-500 transition-all'
+              )}
+            >
+              <span className={`${compact ? 'text-[7px]' : 'text-[10px]'} font-bold text-stone-500 tracking-widest uppercase`}>
+                {config.boardLabel}
+              </span>
+            </div>
+          )}
+          <WallWithElements
+            wall="bottom"
+            elements={getWallElements('bottom')}
+            compact={compact}
+            interactive={interactive}
+            onAdd={handleAdd}
+            onRemove={handleRemove}
+          />
         </div>
-      )}
-
-      {/* ===== JANELAS (windows) - right wall ===== */}
-      {config.windowWall === 'right' && windowCount > 0 && (
-        <div
-          className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 flex flex-col z-10 ${compact ? 'gap-2' : 'gap-3'}`}
-          onClick={cycleWindows}
-          title={interactive ? 'Clique para mudar parede das janelas' : undefined}
-        >
-          {Array.from({ length: windowCount }).map((_, i) => (
-            <div
-              key={i}
-              className={`${compact ? 'w-3 h-7' : 'w-3.5 h-9'} bg-sky-200/80 border-2 border-sky-400/70 rounded-sm shadow-sm ${interactive ? 'cursor-pointer hover:bg-sky-300/80 transition-colors' : ''}`}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* ===== GRID CONTENT ===== */}
-      <div className={compact ? 'p-3 pt-5 pb-5 sm:p-4 sm:pt-6 sm:pb-6' : 'p-5 pt-8 pb-8 sm:p-7 sm:pt-10 sm:pb-10'}>
-        {children}
       </div>
     </div>
   )

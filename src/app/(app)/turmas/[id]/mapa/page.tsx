@@ -283,7 +283,7 @@ export default function MapaEditorPage() {
           {activeDragData?.type === 'cell' && (
             <div className="pointer-events-none w-20 h-16 rounded-lg bg-amber-100 border-2 border-amber-400 shadow-2xl flex items-center justify-center">
               <span className="text-xs font-bold text-amber-700">
-                {activeDragData.cellType === 'professor' ? 'Prof.' : 'Mesa'}
+                {activeDragData.cellType === 'bloqueado' ? 'Bloco' : 'Mesa'}
               </span>
             </div>
           )}

@@ -52,16 +52,6 @@ export function generateMapPdf(options: MapPdfOptions) {
         return
       }
 
-      if (cell.tipo === 'professor') {
-        doc.setFillColor(219, 234, 254) // blue-100
-        doc.rect(x, y, cellW, cellH, 'FD')
-        doc.setFontSize(8)
-        doc.setFont('helvetica', 'bold')
-        doc.text('Prof.', x + cellW / 2, y + cellH / 2 + 1, { align: 'center' })
-        doc.setFont('helvetica', 'normal')
-        return
-      }
-
       // carteira
       const aluno = cell.alunoId ? alunoMap.get(cell.alunoId) : null
       if (aluno) {
