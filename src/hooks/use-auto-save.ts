@@ -1,37 +1,64 @@
 'use client'
 
-import { useRef, useCallback, useState } from 'react'
+import { useRef, useCallback, useEffect, useState } from 'react'
 
 export function useAutoSave(
   saveFn: () => Promise<void>,
   delay: number = 1500
 ) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resetStatusRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const saveFnRef = useRef(saveFn)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
-  const trigger = useCallback(() => {
+  useEffect(() => {
+    saveFnRef.current = saveFn
+  }, [saveFn])
+
+  const clearTimers = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
     }
 
-    setSaveStatus('saving')
-
-    timeoutRef.current = setTimeout(async () => {
-      try {
-        await saveFn()
-        setSaveStatus('saved')
-        setTimeout(() => setSaveStatus('idle'), 2000)
-      } catch {
-        setSaveStatus('error')
-      }
-    }, delay)
-  }, [saveFn, delay])
-
-  const cancel = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
+    if (resetStatusRef.current) {
+      clearTimeout(resetStatusRef.current)
+      resetStatusRef.current = null
     }
   }, [])
 
-  return { trigger, cancel, saveStatus }
+  const runSave = useCallback(async () => {
+    clearTimers()
+    setSaveStatus('saving')
+
+    try {
+      await saveFnRef.current()
+      setSaveStatus('saved')
+      resetStatusRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch {
+      setSaveStatus('error')
+    }
+  }, [clearTimers])
+
+  const trigger = useCallback(() => {
+    clearTimers()
+    setSaveStatus('saving')
+
+    timeoutRef.current = setTimeout(() => {
+      void runSave()
+    }, delay)
+  }, [clearTimers, delay, runSave])
+
+  const cancel = useCallback(() => {
+    clearTimers()
+    setSaveStatus('idle')
+  }, [clearTimers])
+
+  const flush = useCallback(async () => {
+    await runSave()
+  }, [runSave])
+
+  useEffect(() => cancel, [cancel])
+
+  return { trigger, cancel, flush, saveStatus }
 }

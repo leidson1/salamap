@@ -1,20 +1,19 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { getSupabaseConfigHelpText, getSupabaseResolvedConfig } from '@/lib/supabase/config'
 
 let client: ReturnType<typeof createBrowserClient> | null = null
+let warnedAboutSupabaseConfig = false
 
 export function createClient() {
   if (client) return client
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  const { isConfigured, resolvedUrl, resolvedAnonKey } = getSupabaseResolvedConfig()
 
-  if (!url || !key) {
-    return createBrowserClient(
-      'https://placeholder.supabase.co',
-      'placeholder-key'
-    )
+  if (!isConfigured && !warnedAboutSupabaseConfig) {
+    console.warn(getSupabaseConfigHelpText())
+    warnedAboutSupabaseConfig = true
   }
 
-  client = createBrowserClient(url, key)
+  client = createBrowserClient(resolvedUrl, resolvedAnonKey)
   return client
 }

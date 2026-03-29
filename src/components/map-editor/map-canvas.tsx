@@ -3,16 +3,21 @@
 import { useRef, useCallback, useEffect, useState } from 'react'
 import { Stage, Layer, Rect, Group, Text, Line, Circle } from 'react-konva'
 import type Konva from 'konva'
+import type { FurnitureTool } from '@/lib/map/furniture-tools'
 import type { Grid, Aluno, RoomConfig } from '@/types/database'
+import { clampWallPosition } from '@/lib/map/room-config'
+import { getCellBlockId } from '@/lib/map/utils'
 import { DEFAULT_ROOM_CONFIG } from '@/types/database'
 
 // Layout constants
 const CELL_W = 90
-const CELL_H = 80
-const CELL_GAP = 12
-const WALL_THICKNESS = 32
-const TEACHER_AREA_H = 70
-const PADDING = 20
+const CELL_H = 78
+const CELL_GAP = 10
+const WALL_THICKNESS = 30
+const TEACHER_AREA_H = 65
+const PADDING = 16
+const WALL_DRAG_THRESHOLD = 90
+const BLOCK_CONNECTOR = CELL_GAP / 2 + 2
 
 interface MapCanvasProps {
   grid: Grid
@@ -20,13 +25,72 @@ interface MapCanvasProps {
   linhas: number
   alunos: Aluno[]
   roomConfig?: RoomConfig | null
-  mode: 'alunos' | 'mobiliar'
+  mode: 'alunos' | 'mobiliar' | 'sala'
+  furnitureTool: FurnitureTool
   selectedStudentId?: number | null
+  selectedFurnitureBlockId?: string | null
+  selectedRoomElementId?: string | null
   onStudentPlace: (alunoId: number, row: number, col: number) => void
   onStudentRemove: (row: number, col: number) => void
   onCellSwap: (fromR: number, fromC: number, toR: number, toC: number) => void
-  onToggleCell: (row: number, col: number) => void
+  onFurnitureStamp: (row: number, col: number) => void
+  onFurnitureBlockSelect?: (blockId: string | null) => void
   onRoomConfigChange?: (config: RoomConfig) => void
+  onRoomElementSelect?: (elementId: string | null) => void
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function getNearestTeacherDeskPosition(canvasW: number, centerX: number): RoomConfig['teacherDesk'] {
+  const leftBoundary = canvasW / 3
+  const rightBoundary = (canvasW / 3) * 2
+
+  if (centerX <= leftBoundary) return 'left'
+  if (centerX >= rightBoundary) return 'right'
+  return 'center'
+}
+
+function getWallDropTarget(
+  px: number,
+  py: number,
+  canvasW: number,
+  canvasH: number,
+  currentWall: RoomConfig['wallElements'][number]['wall']
+) {
+  const distances = [
+    { wall: 'top' as const, distance: py },
+    { wall: 'bottom' as const, distance: canvasH - py },
+    { wall: 'left' as const, distance: px },
+    { wall: 'right' as const, distance: canvasW - px },
+  ]
+
+  const nearest = distances.reduce((best, candidate) =>
+    candidate.distance < best.distance ? candidate : best
+  )
+
+  const wall = nearest.distance <= WALL_DRAG_THRESHOLD ? nearest.wall : currentWall
+  const innerWidth = canvasW - WALL_THICKNESS * 2
+  const innerHeight = canvasH - WALL_THICKNESS * 2
+
+  const rawPosition = wall === 'top' || wall === 'bottom'
+    ? (clamp(px - WALL_THICKNESS, 0, innerWidth) / innerWidth) * 100
+    : (clamp(py - WALL_THICKNESS, 0, innerHeight) / innerHeight) * 100
+
+  return {
+    wall,
+    position: clampWallPosition(rawPosition),
+  }
+}
+
+type DraggableNode = Pick<Konva.Node, 'x' | 'y'>
+
+interface DeskConnections {
+  left: boolean
+  right: boolean
+  top: boolean
+  bottom: boolean
 }
 
 function getCanvasSize(linhas: number, colunas: number) {
@@ -37,152 +101,324 @@ function getCanvasSize(linhas: number, colunas: number) {
   return { totalW, totalH, gridW, gridH }
 }
 
-function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver }: {
+// Clean color palette
+const COLORS = {
+  floor: '#f8fafc',       // slate-50
+  floorGrid: '#f1f5f9',   // slate-100
+  wall: '#e2e8f0',        // slate-200
+  wallBorder: '#cbd5e1',   // slate-300
+  deskEmpty: '#ffffff',
+  deskEmptyBorder: '#e2e8f0',
+  deskOccupied: '#f0fdf4', // green-50
+  deskOccupiedBorder: '#86efac', // green-300
+  deskHighlight: '#dcfce7', // green-100
+  deskHighlightBorder: '#4ade80',
+  chair: '#94a3b8',        // slate-400
+  chairEmpty: '#cbd5e1',   // slate-300
+  studentNum: '#15803d',   // green-700
+  studentName: '#374151',  // gray-700
+  boardBg: '#ffffff',
+  boardBorder: '#94a3b8',
+  teacherBg: '#eff6ff',    // blue-50
+  teacherBorder: '#93c5fd', // blue-300
+  teacherText: '#1d4ed8',
+  separator: '#e2e8f0',
+  blocked: '#f1f5f9',
+  blockedStroke: '#cbd5e1',
+  doorBg: 'rgba(120,113,108,0.15)',
+  doorBorder: '#78716c',
+  windowBg: '#e0f2fe',
+  windowBorder: '#7dd3fc',
+}
+
+function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, selected, connections }: {
   x: number; y: number; w: number; h: number
   occupied: boolean; studentName?: string; studentNum?: number | null
   isDragOver?: boolean
+  selected?: boolean
+  connections: DeskConnections
 }) {
-  const deskH = h * 0.75
-  const chairH = 8
+  const deskH = h * 0.72
+  const chairW = 18
+  const chairH = 7
+  const connectorInsetX = 10
+  const connectorInsetY = 8
+
+  const bgColor = isDragOver ? COLORS.deskHighlight
+    : selected ? '#fef3c7'
+    : occupied ? COLORS.deskOccupied : COLORS.deskEmpty
+  const borderColor = isDragOver ? COLORS.deskHighlightBorder
+    : selected ? '#f59e0b'
+    : occupied ? COLORS.deskOccupiedBorder : COLORS.deskEmptyBorder
 
   return (
     <Group x={x} y={y}>
+      {connections.left && (
+        <Rect
+          x={-BLOCK_CONNECTOR}
+          y={connectorInsetY}
+          width={BLOCK_CONNECTOR + 2}
+          height={deskH - connectorInsetY * 2}
+          cornerRadius={4}
+          fill={bgColor}
+        />
+      )}
+      {connections.right && (
+        <Rect
+          x={w - 2}
+          y={connectorInsetY}
+          width={BLOCK_CONNECTOR + 2}
+          height={deskH - connectorInsetY * 2}
+          cornerRadius={4}
+          fill={bgColor}
+        />
+      )}
+      {connections.top && (
+        <Rect
+          x={connectorInsetX}
+          y={-BLOCK_CONNECTOR}
+          width={w - connectorInsetX * 2}
+          height={BLOCK_CONNECTOR + 2}
+          cornerRadius={4}
+          fill={bgColor}
+        />
+      )}
+      {connections.bottom && (
+        <Rect
+          x={connectorInsetX}
+          y={deskH - 2}
+          width={w - connectorInsetX * 2}
+          height={BLOCK_CONNECTOR + 2}
+          cornerRadius={4}
+          fill={bgColor}
+        />
+      )}
       {/* Shadow */}
       <Rect
-        x={3} y={4} width={w} height={deskH}
-        cornerRadius={[8, 8, 3, 3]}
-        fill="rgba(0,0,0,0.08)"
+        x={2} y={3} width={w} height={deskH}
+        cornerRadius={6}
+        fill="rgba(0,0,0,0.05)"
       />
       {/* Desk surface */}
       <Rect
         width={w} height={deskH}
-        cornerRadius={[8, 8, 3, 3]}
-        fill={isDragOver ? '#d1fae5' : occupied ? '#fef3c7' : '#fefce8'}
-        stroke={isDragOver ? '#34d399' : occupied ? '#d97706' : '#e5e7eb'}
-        strokeWidth={occupied ? 2 : 1.5}
+        cornerRadius={6}
+        fill={bgColor}
+        stroke={borderColor}
+        strokeWidth={selected || occupied ? 2 : 1}
       />
-      {/* Wood grain lines */}
-      {occupied && (
-        <>
-          <Line points={[8, deskH * 0.3, w - 8, deskH * 0.3]} stroke="#f59e0b" strokeWidth={0.3} opacity={0.3} />
-          <Line points={[8, deskH * 0.6, w - 8, deskH * 0.6]} stroke="#f59e0b" strokeWidth={0.3} opacity={0.3} />
-        </>
-      )}
       {/* Student info */}
       {occupied && studentNum !== undefined && (
         <>
           <Circle
             x={w / 2} y={deskH * 0.32}
-            radius={12}
-            fill="#059669" opacity={0.15}
+            radius={11}
+            fill={COLORS.studentNum} opacity={0.1}
           />
           <Text
             x={0} y={deskH * 0.18} width={w}
             text={String(studentNum ?? '?')}
-            fontSize={13} fontStyle="bold" fill="#047857"
+            fontSize={12} fontStyle="bold" fill={COLORS.studentNum}
             align="center"
           />
           <Text
             x={4} y={deskH * 0.52} width={w - 8}
             text={studentName?.split(' ')[0] ?? ''}
-            fontSize={10} fill="#78350f"
+            fontSize={10} fill={COLORS.studentName}
             align="center" ellipsis wrap="none"
           />
         </>
       )}
-      {!occupied && (
+      {!occupied && !isDragOver && (
         <Text
-          x={0} y={deskH * 0.35} width={w}
-          text="vazio" fontSize={9} fill="#d1d5db"
+          x={0} y={deskH * 0.38} width={w}
+          text="" fontSize={9} fill="#d1d5db"
           align="center"
         />
       )}
-      {/* Chair (semicircle) */}
+      {isDragOver && (
+        <Text
+          x={0} y={deskH * 0.32} width={w}
+          text="Soltar aqui" fontSize={9} fill={COLORS.studentNum}
+          align="center"
+        />
+      )}
+      {/* Chair */}
       <Rect
-        x={w / 2 - 10} y={deskH + 2}
-        width={20} height={chairH}
-        cornerRadius={[0, 0, 10, 10]}
-        fill={occupied ? '#78716c' : '#d6d3d1'}
+        x={w / 2 - chairW / 2} y={deskH + 2}
+        width={chairW} height={chairH}
+        cornerRadius={[0, 0, 9, 9]}
+        fill={occupied ? COLORS.chair : COLORS.chairEmpty}
       />
     </Group>
   )
 }
 
-function WallElements({ config, canvasW, canvasH, gridStartY, interactive, onConfigChange }: {
-  config: RoomConfig; canvasW: number; canvasH: number; gridStartY: number
-  interactive: boolean; onConfigChange?: (c: RoomConfig) => void
+function getDeskConnections(grid: Grid, row: number, col: number): DeskConnections {
+  const cell = grid[row]?.[col]
+  const blocoId = getCellBlockId(cell, row, col)
+
+  if (!cell || cell.tipo !== 'carteira' || !blocoId) {
+    return { left: false, right: false, top: false, bottom: false }
+  }
+
+  return {
+    left: getCellBlockId(grid[row]?.[col - 1], row, col - 1) === blocoId,
+    right: getCellBlockId(grid[row]?.[col + 1], row, col + 1) === blocoId,
+    top: getCellBlockId(grid[row - 1]?.[col], row - 1, col) === blocoId,
+    bottom: getCellBlockId(grid[row + 1]?.[col], row + 1, col) === blocoId,
+  }
+}
+
+function WallElements({ config, canvasW, canvasH, interactive, selectedElementId, onConfigChange, onSelectElement }: {
+  config: RoomConfig; canvasW: number; canvasH: number
+  interactive: boolean; selectedElementId?: string | null
+  onConfigChange?: (config: RoomConfig) => void
+  onSelectElement?: (elementId: string | null) => void
 }) {
   const wallEls = config.wallElements ?? []
 
   const handleBoardClick = () => {
-    if (!interactive || !onConfigChange) return
-    onConfigChange({ ...config, boardWall: config.boardWall === 'top' ? 'bottom' : 'top' })
+    if (!interactive) return
+    onSelectElement?.('board')
   }
 
   const handleTeacherClick = () => {
-    if (!interactive || !onConfigChange) return
-    const positions: Array<RoomConfig['teacherDesk']> = ['left', 'center', 'right', 'none']
-    const idx = positions.indexOf(config.teacherDesk)
-    onConfigChange({ ...config, teacherDesk: positions[(idx + 1) % positions.length] })
+    if (!interactive) return
+    onSelectElement?.('teacher-desk')
   }
 
-  // Board position
-  const boardY = config.boardWall === 'top' ? 6 : canvasH - WALL_THICKNESS + 4
-  const boardW = Math.min(canvasW * 0.5, 250)
+  const handleBoardDrop = (node: DraggableNode) => {
+    if (!interactive || !onConfigChange) return
 
-  // Teacher desk position
-  const teacherY = config.boardWall === 'top' ? WALL_THICKNESS + 10 : canvasH - WALL_THICKNESS - TEACHER_AREA_H + 10
-  const teacherW = 120
+    const boardCenterY = node.y() + 10
+    onSelectElement?.('board')
+    onConfigChange({
+      ...config,
+      boardWall: boardCenterY < canvasH / 2 ? 'top' : 'bottom',
+    })
+  }
+
+  const handleTeacherDrop = (node: DraggableNode) => {
+    if (!interactive || !onConfigChange) return
+
+    const teacherCenterX = node.x() + 55
+    onSelectElement?.('teacher-desk')
+    onConfigChange({
+      ...config,
+      teacherDesk: getNearestTeacherDeskPosition(canvasW, teacherCenterX),
+    })
+  }
+
+  const handleWallElementDrop = (
+    elementId: string,
+    currentWall: RoomConfig['wallElements'][number]['wall'],
+    width: number,
+    height: number,
+    node: DraggableNode
+  ) => {
+    if (!interactive || !onConfigChange) return
+
+    const centerX = node.x() + width / 2
+    const centerY = node.y() + height / 2
+    const nextTarget = getWallDropTarget(centerX, centerY, canvasW, canvasH, currentWall)
+
+    onSelectElement?.(elementId)
+    onConfigChange({
+      ...config,
+      wallElements: wallEls.map((item) =>
+        item.id === elementId
+          ? { ...item, ...nextTarget }
+          : item
+      ),
+    })
+  }
+
+  const boardY = config.boardWall === 'top' ? 5 : canvasH - WALL_THICKNESS + 4
+  const boardW = Math.min(canvasW * 0.5, 240)
+
+  const teacherY = config.boardWall === 'top' ? WALL_THICKNESS + 12 : canvasH - WALL_THICKNESS - TEACHER_AREA_H + 12
+  const teacherW = 110
   const teacherX = config.teacherDesk === 'left'
     ? WALL_THICKNESS + 20
     : config.teacherDesk === 'right'
       ? canvasW - WALL_THICKNESS - teacherW - 20
       : (canvasW - teacherW) / 2
 
+  const boardSelected = selectedElementId === 'board'
+  const teacherSelected = selectedElementId === 'teacher-desk'
+
   return (
     <Group>
-      {/* Whiteboard */}
-      <Group onClick={handleBoardClick}>
+      {/* Board */}
+      <Group
+        x={(canvasW - boardW) / 2}
+        y={boardY}
+        draggable={interactive}
+        dragBoundFunc={(pos) => ({
+          x: (canvasW - boardW) / 2,
+          y: clamp(pos.y, 5, canvasH - WALL_THICKNESS + 4),
+        })}
+        onClick={handleBoardClick}
+        onDragStart={() => onSelectElement?.('board')}
+        onDragEnd={(event) => handleBoardDrop(event.target)}
+        style={{ cursor: interactive ? 'move' : 'default' }}
+      >
         <Rect
-          x={(canvasW - boardW) / 2} y={boardY}
-          width={boardW} height={22}
-          fill="white" stroke="#a8a29e" strokeWidth={2}
+          width={boardW} height={20}
+          fill={boardSelected ? '#ecfeff' : COLORS.boardBg}
+          stroke={boardSelected ? '#06b6d4' : COLORS.boardBorder}
+          strokeWidth={boardSelected ? 2 : 1.5}
           cornerRadius={3}
-          shadowColor="rgba(0,0,0,0.1)" shadowBlur={4} shadowOffsetY={2}
+          shadowColor="rgba(0,0,0,0.06)" shadowBlur={3} shadowOffsetY={1}
         />
         <Text
-          x={(canvasW - boardW) / 2} y={boardY + 4}
+          x={0} y={4}
           width={boardW} text={config.boardLabel}
-          fontSize={11} fontStyle="bold" fill="#78716c"
+          fontSize={10} fontStyle="bold" fill="#94a3b8"
           align="center" letterSpacing={2}
         />
       </Group>
 
       {/* Teacher desk */}
       {config.teacherDesk !== 'none' && (
-        <Group onClick={handleTeacherClick}>
+        <Group
+          x={teacherX}
+          y={teacherY}
+          draggable={interactive}
+          dragBoundFunc={(pos) => ({
+            x: clamp(pos.x, WALL_THICKNESS + 20, canvasW - WALL_THICKNESS - teacherW - 20),
+            y: teacherY,
+          })}
+          onClick={handleTeacherClick}
+          onDragStart={() => onSelectElement?.('teacher-desk')}
+          onDragEnd={(event) => handleTeacherDrop(event.target)}
+          style={{ cursor: interactive ? 'move' : 'default' }}
+        >
           <Rect
-            x={teacherX - 2} y={teacherY + 2}
-            width={teacherW} height={40}
-            cornerRadius={6} fill="rgba(0,0,0,0.06)"
+            x={2} y={2}
+            width={teacherW} height={36}
+            cornerRadius={5} fill="rgba(0,0,0,0.04)"
           />
           <Rect
-            x={teacherX} y={teacherY}
-            width={teacherW} height={40}
-            cornerRadius={6}
-            fill="#e0f2fe" stroke="#38bdf8" strokeWidth={2}
+            width={teacherW} height={36}
+            cornerRadius={5}
+            fill={teacherSelected ? '#dbeafe' : COLORS.teacherBg}
+            stroke={teacherSelected ? '#2563eb' : COLORS.teacherBorder}
+            strokeWidth={teacherSelected ? 2 : 1.5}
           />
           <Text
-            x={teacherX} y={teacherY + 12}
+            x={0} y={11}
             width={teacherW} text="Professor"
-            fontSize={11} fontStyle="bold" fill="#0369a1"
+            fontSize={10} fontStyle="bold" fill={COLORS.teacherText}
             align="center"
           />
         </Group>
       )}
 
-      {/* Wall elements (doors & windows) */}
+      {/* Doors & Windows */}
       {wallEls.map((el) => {
+        const selected = selectedElementId === el.id
         const isH = el.wall === 'top' || el.wall === 'bottom'
         const maxLen = isH ? canvasW - WALL_THICKNESS * 2 : canvasH - WALL_THICKNESS * 2
         const pos = (el.position / 100) * maxLen
@@ -194,23 +430,71 @@ function WallElements({ config, canvasW, canvasH, gridStartY, interactive, onCon
         else { ex = canvasW - WALL_THICKNESS + 2; ey = WALL_THICKNESS + pos }
 
         if (el.type === 'porta') {
-          const pw = isH ? 30 : WALL_THICKNESS - 6
-          const ph = isH ? WALL_THICKNESS - 6 : 30
+          const pw = isH ? 28 : WALL_THICKNESS - 6
+          const ph = isH ? WALL_THICKNESS - 6 : 28
           return (
-            <Group key={el.id} x={ex} y={ey}>
-              <Rect width={pw} height={ph} fill="#92400e" opacity={0.25} cornerRadius={3} stroke="#92400e" strokeWidth={1.5} />
-              <Text x={0} y={ph / 2 - 5} width={pw} text="P" fontSize={10} fontStyle="bold" fill="#92400e" align="center" />
+            <Group
+              key={el.id}
+              x={ex}
+              y={ey}
+              draggable={interactive}
+              dragBoundFunc={(pos) => ({
+                x: clamp(pos.x, 0, canvasW - pw),
+                y: clamp(pos.y, 0, canvasH - ph),
+              })}
+              onClick={() => interactive && onSelectElement?.(el.id)}
+              onDragStart={() => interactive && onSelectElement?.(el.id)}
+              onDragEnd={(event) => handleWallElementDrop(el.id, el.wall, pw, ph, event.target)}
+              style={{ cursor: interactive ? 'move' : 'default' }}
+            >
+              <Rect
+                width={pw}
+                height={ph}
+                fill={selected ? 'rgba(8,145,178,0.18)' : COLORS.doorBg}
+                cornerRadius={2}
+                stroke={selected ? '#0891b2' : COLORS.doorBorder}
+                strokeWidth={selected ? 2 : 1}
+              />
+              <Text
+                x={0}
+                y={ph / 2 - 4}
+                width={pw}
+                text="P"
+                fontSize={9}
+                fontStyle="bold"
+                fill={selected ? '#0f766e' : COLORS.doorBorder}
+                align="center"
+              />
             </Group>
           )
         }
-        // janela
-        const jw = isH ? 35 : WALL_THICKNESS - 6
-        const jh = isH ? WALL_THICKNESS - 6 : 35
+        const jw = isH ? 32 : WALL_THICKNESS - 6
+        const jh = isH ? WALL_THICKNESS - 6 : 32
         return (
-          <Group key={el.id} x={ex} y={ey}>
-            <Rect width={jw} height={jh} fill="#bae6fd" stroke="#38bdf8" strokeWidth={1.5} cornerRadius={2} />
-            <Line points={[jw / 2, 0, jw / 2, jh]} stroke="#7dd3fc" strokeWidth={1} />
-            <Line points={[0, jh / 2, jw, jh / 2]} stroke="#7dd3fc" strokeWidth={1} />
+          <Group
+            key={el.id}
+            x={ex}
+            y={ey}
+            draggable={interactive}
+            dragBoundFunc={(pos) => ({
+              x: clamp(pos.x, 0, canvasW - jw),
+              y: clamp(pos.y, 0, canvasH - jh),
+            })}
+            onClick={() => interactive && onSelectElement?.(el.id)}
+            onDragStart={() => interactive && onSelectElement?.(el.id)}
+            onDragEnd={(event) => handleWallElementDrop(el.id, el.wall, jw, jh, event.target)}
+            style={{ cursor: interactive ? 'move' : 'default' }}
+          >
+            <Rect
+              width={jw}
+              height={jh}
+              fill={selected ? '#cffafe' : COLORS.windowBg}
+              stroke={selected ? '#0891b2' : COLORS.windowBorder}
+              strokeWidth={selected ? 2 : 1}
+              cornerRadius={2}
+            />
+            <Line points={[jw / 2, 0, jw / 2, jh]} stroke={selected ? '#0891b2' : COLORS.windowBorder} strokeWidth={0.5} opacity={0.6} />
+            <Line points={[0, jh / 2, jw, jh / 2]} stroke={selected ? '#0891b2' : COLORS.windowBorder} strokeWidth={0.5} opacity={0.6} />
           </Group>
         )
       })}
@@ -219,26 +503,21 @@ function WallElements({ config, canvasW, canvasH, gridStartY, interactive, onCon
 }
 
 export function MapCanvas({
-  grid, colunas, linhas, alunos, roomConfig, mode, selectedStudentId,
-  onStudentPlace, onStudentRemove, onCellSwap, onToggleCell, onRoomConfigChange,
+  grid, colunas, linhas, alunos, roomConfig, mode, furnitureTool, selectedStudentId, selectedFurnitureBlockId, selectedRoomElementId,
+  onStudentPlace, onStudentRemove, onCellSwap, onFurnitureStamp, onFurnitureBlockSelect, onRoomConfigChange, onRoomElementSelect,
 }: MapCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [containerWidth, setContainerWidth] = useState(800)
-  const [draggedStudent, setDraggedStudent] = useState<number | null>(null)
+  const [containerWidth, setContainerWidth] = useState(900)
   const [dragOverCell, setDragOverCell] = useState<{ r: number; c: number } | null>(null)
 
   const config = roomConfig ?? DEFAULT_ROOM_CONFIG
   const alunoMap = new Map(alunos.map((a) => [a.id, a]))
-
   const { totalW, totalH } = getCanvasSize(linhas, colunas)
 
-  // Responsive scaling
   useEffect(() => {
     const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth)
-      }
+      if (containerRef.current) setContainerWidth(containerRef.current.offsetWidth)
     }
     updateWidth()
     window.addEventListener('resize', updateWidth)
@@ -249,90 +528,130 @@ export function MapCanvas({
   const displayW = totalW * scale
   const displayH = totalH * scale
 
-  // Grid offset (inside walls, after teacher area)
   const boardAtTop = config.boardWall === 'top'
   const gridOffsetX = WALL_THICKNESS + PADDING
   const gridOffsetY = boardAtTop
     ? WALL_THICKNESS + TEACHER_AREA_H + PADDING
     : WALL_THICKNESS + PADDING
 
-  const getCellPos = (row: number, col: number) => ({
+  const getCellPos = useCallback((row: number, col: number) => ({
     x: gridOffsetX + col * (CELL_W + CELL_GAP),
     y: gridOffsetY + row * (CELL_H + CELL_GAP),
-  })
+  }), [gridOffsetX, gridOffsetY])
 
   const getCellFromPos = useCallback((px: number, py: number) => {
     for (let r = 0; r < linhas; r++) {
       for (let c = 0; c < colunas; c++) {
-        const { x, y } = getCellPos(r, c)
-        if (px >= x && px <= x + CELL_W && py >= y && py <= y + CELL_H) {
+        const pos = getCellPos(r, c)
+        if (px >= pos.x && px <= pos.x + CELL_W && py >= pos.y && py <= pos.y + CELL_H) {
           return { r, c }
         }
       }
     }
     return null
-  }, [linhas, colunas, gridOffsetX, gridOffsetY])
+  }, [linhas, colunas, getCellPos])
+
+  // Handle HTML drag (from sidebar) into canvas
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const px = (e.clientX - rect.left) / scale
+    const py = (e.clientY - rect.top) / scale
+    const cell = getCellFromPos(px, py)
+    setDragOverCell(cell)
+  }, [scale, getCellFromPos])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOverCell(null)
+    const alunoId = parseInt(e.dataTransfer.getData('text/plain'))
+    if (isNaN(alunoId)) return
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const px = (e.clientX - rect.left) / scale
+    const py = (e.clientY - rect.top) / scale
+    const cell = getCellFromPos(px, py)
+    if (cell) {
+      const gridCell = grid[cell.r]?.[cell.c]
+      if (gridCell && (gridCell.tipo === 'carteira' || gridCell.tipo === 'vazio') && !gridCell.alunoId) {
+        onStudentPlace(alunoId, cell.r, cell.c)
+      }
+    }
+  }, [scale, getCellFromPos, grid, onStudentPlace])
+
+  const handleDragLeave = useCallback(() => setDragOverCell(null), [])
 
   return (
-    <div ref={containerRef} className="w-full">
+    <div
+      ref={containerRef}
+      className="w-full flex justify-center"
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onDragLeave={handleDragLeave}
+    >
       <Stage
         ref={stageRef}
         width={displayW}
         height={displayH}
         scaleX={scale}
         scaleY={scale}
-        className="rounded-xl overflow-hidden"
-        style={{ background: '#fefce8' }}
+        className="rounded-xl"
+        style={{ background: COLORS.floor }}
+        onMouseDown={(event) => {
+          if (mode === 'sala' && event.target === event.target.getStage()) {
+            onRoomElementSelect?.(null)
+          }
+          if (mode === 'mobiliar' && furnitureTool === 'move' && event.target === event.target.getStage()) {
+            onFurnitureBlockSelect?.(null)
+          }
+        }}
       >
         {/* Background & Walls */}
         <Layer>
-          {/* Floor */}
-          <Rect x={0} y={0} width={totalW} height={totalH} fill="#fffbeb" cornerRadius={12} />
+          <Rect x={0} y={0} width={totalW} height={totalH} fill={COLORS.floor} cornerRadius={12} />
 
-          {/* Floor grid lines */}
+          {/* Subtle grid lines */}
           {Array.from({ length: Math.ceil(totalW / 50) + 1 }).map((_, i) => (
-            <Line key={`vl-${i}`} points={[i * 50, 0, i * 50, totalH]} stroke="#f5f5f4" strokeWidth={0.5} />
+            <Line key={`vl-${i}`} points={[i * 50, 0, i * 50, totalH]} stroke={COLORS.floorGrid} strokeWidth={0.5} />
           ))}
           {Array.from({ length: Math.ceil(totalH / 50) + 1 }).map((_, i) => (
-            <Line key={`hl-${i}`} points={[0, i * 50, totalW, i * 50]} stroke="#f5f5f4" strokeWidth={0.5} />
+            <Line key={`hl-${i}`} points={[0, i * 50, totalW, i * 50]} stroke={COLORS.floorGrid} strokeWidth={0.5} />
           ))}
 
           {/* Walls */}
-          <Rect x={0} y={0} width={totalW} height={WALL_THICKNESS} fill="#d6d3d1" cornerRadius={[12, 12, 0, 0]} />
-          <Rect x={0} y={totalH - WALL_THICKNESS} width={totalW} height={WALL_THICKNESS} fill="#d6d3d1" cornerRadius={[0, 0, 12, 12]} />
-          <Rect x={0} y={0} width={WALL_THICKNESS} height={totalH} fill="#d6d3d1" cornerRadius={[12, 0, 0, 12]} />
-          <Rect x={totalW - WALL_THICKNESS} y={0} width={WALL_THICKNESS} height={totalH} fill="#d6d3d1" cornerRadius={[0, 12, 12, 0]} />
+          <Rect x={0} y={0} width={totalW} height={WALL_THICKNESS} fill={COLORS.wall} cornerRadius={[12, 12, 0, 0]} />
+          <Rect x={0} y={totalH - WALL_THICKNESS} width={totalW} height={WALL_THICKNESS} fill={COLORS.wall} cornerRadius={[0, 0, 12, 12]} />
+          <Rect x={0} y={0} width={WALL_THICKNESS} height={totalH} fill={COLORS.wall} cornerRadius={[12, 0, 0, 12]} />
+          <Rect x={totalW - WALL_THICKNESS} y={0} width={WALL_THICKNESS} height={totalH} fill={COLORS.wall} cornerRadius={[0, 12, 12, 0]} />
 
-          {/* Wall inner border */}
           <Rect
             x={WALL_THICKNESS} y={WALL_THICKNESS}
             width={totalW - WALL_THICKNESS * 2} height={totalH - WALL_THICKNESS * 2}
-            stroke="#a8a29e" strokeWidth={2} fill="transparent"
+            stroke={COLORS.wallBorder} strokeWidth={1} fill="transparent"
           />
 
-          {/* Separator line (teacher area / student area) */}
           {config.teacherDesk !== 'none' && (
             <Line
               points={[
-                WALL_THICKNESS + 10,
+                WALL_THICKNESS + 8,
                 boardAtTop ? WALL_THICKNESS + TEACHER_AREA_H : totalH - WALL_THICKNESS - TEACHER_AREA_H,
-                totalW - WALL_THICKNESS - 10,
+                totalW - WALL_THICKNESS - 8,
                 boardAtTop ? WALL_THICKNESS + TEACHER_AREA_H : totalH - WALL_THICKNESS - TEACHER_AREA_H,
               ]}
-              stroke="#d6d3d1" strokeWidth={1} dash={[6, 4]}
+              stroke={COLORS.separator} strokeWidth={1} dash={[5, 3]}
             />
           )}
         </Layer>
 
-        {/* Wall elements (board, teacher desk, doors, windows) */}
+        {/* Wall elements */}
         <Layer>
           <WallElements
-            config={config}
-            canvasW={totalW}
-            canvasH={totalH}
-            gridStartY={gridOffsetY}
-            interactive={mode === 'mobiliar'}
+            config={config} canvasW={totalW} canvasH={totalH}
+            interactive={mode === 'sala'}
+            selectedElementId={selectedRoomElementId}
             onConfigChange={onRoomConfigChange}
+            onSelectElement={onRoomElementSelect}
           />
         </Layer>
 
@@ -340,18 +659,26 @@ export function MapCanvas({
         <Layer>
           {grid.map((row, rIdx) =>
             row.map((cell, cIdx) => {
-              const { x, y } = getCellPos(rIdx, cIdx)
+              const pos = getCellPos(rIdx, cIdx)
 
               if (cell.tipo === 'vazio') {
                 return (
                   <Group
                     key={`${rIdx}-${cIdx}`}
-                    onClick={() => onToggleCell(rIdx, cIdx)}
+                    onClick={() => {
+                      if (mode === 'mobiliar') {
+                        if (furnitureTool !== 'move') {
+                          onFurnitureStamp(rIdx, cIdx)
+                        } else {
+                          onFurnitureBlockSelect?.(null)
+                        }
+                      }
+                    }}
                   >
                     <Rect
-                      x={x} y={y} width={CELL_W} height={CELL_H}
-                      fill="transparent" stroke="#e5e7eb" strokeWidth={1}
-                      dash={[4, 4]} cornerRadius={6}
+                      x={pos.x} y={pos.y} width={CELL_W} height={CELL_H}
+                      fill="transparent" stroke={COLORS.deskEmptyBorder} strokeWidth={0.5}
+                      dash={[3, 3]} cornerRadius={4}
                     />
                   </Group>
                 )
@@ -361,40 +688,58 @@ export function MapCanvas({
                 return (
                   <Group
                     key={`${rIdx}-${cIdx}`}
-                    onClick={() => onToggleCell(rIdx, cIdx)}
+                    onClick={() => {
+                      if (mode === 'mobiliar') {
+                        if (furnitureTool !== 'move') {
+                          onFurnitureStamp(rIdx, cIdx)
+                        } else {
+                          onFurnitureBlockSelect?.(null)
+                        }
+                      }
+                    }}
                   >
                     <Rect
-                      x={x} y={y} width={CELL_W} height={CELL_H}
-                      fill="#e7e5e4" stroke="#a8a29e" strokeWidth={1}
-                      cornerRadius={6}
+                      x={pos.x} y={pos.y} width={CELL_W} height={CELL_H}
+                      fill={COLORS.blocked} stroke={COLORS.blockedStroke} strokeWidth={1} cornerRadius={4}
                     />
-                    <Line points={[x + 10, y + 10, x + CELL_W - 10, y + CELL_H - 10]} stroke="#a8a29e" strokeWidth={1.5} />
-                    <Line points={[x + CELL_W - 10, y + 10, x + 10, y + CELL_H - 10]} stroke="#a8a29e" strokeWidth={1.5} />
+                    <Line points={[pos.x + 8, pos.y + 8, pos.x + CELL_W - 8, pos.y + CELL_H - 8]} stroke={COLORS.blockedStroke} strokeWidth={1} />
+                    <Line points={[pos.x + CELL_W - 8, pos.y + 8, pos.x + 8, pos.y + CELL_H - 8]} stroke={COLORS.blockedStroke} strokeWidth={1} />
                   </Group>
                 )
               }
 
-              // Carteira
               const aluno = cell.alunoId ? alunoMap.get(cell.alunoId) : null
               const isOver = dragOverCell?.r === rIdx && dragOverCell?.c === cIdx
+              const connections = getDeskConnections(grid, rIdx, cIdx)
+              const blockId = getCellBlockId(cell, rIdx, cIdx)
+              const selected = mode === 'mobiliar' && selectedFurnitureBlockId === blockId
 
               return (
                 <Group
                   key={`${rIdx}-${cIdx}`}
-                  draggable={mode === 'mobiliar'}
+                  draggable={mode === 'mobiliar' && furnitureTool === 'move'}
                   onClick={() => {
                     if (mode === 'alunos') {
                       if (selectedStudentId && !aluno && cell.tipo === 'carteira') {
                         onStudentPlace(selectedStudentId, rIdx, cIdx)
                       } else if (aluno) {
                         onStudentRemove(rIdx, cIdx)
+                      }
+                    } else if (mode === 'mobiliar') {
+                      if (furnitureTool === 'move') {
+                        onFurnitureBlockSelect?.(blockId)
                       } else {
-                        onToggleCell(rIdx, cIdx)
+                        onFurnitureStamp(rIdx, cIdx)
                       }
                     }
                   }}
+                  onDragStart={() => {
+                    if (mode === 'mobiliar' && furnitureTool === 'move') {
+                      onFurnitureBlockSelect?.(blockId)
+                    }
+                  }}
                   onDragEnd={(e) => {
-                    if (mode !== 'mobiliar') return
+                    if (mode !== 'mobiliar' || furnitureTool !== 'move') return
                     const stage = stageRef.current
                     if (!stage) return
                     const pointer = stage.getPointerPosition()
@@ -403,16 +748,17 @@ export function MapCanvas({
                     if (target && (target.r !== rIdx || target.c !== cIdx)) {
                       onCellSwap(rIdx, cIdx, target.r, target.c)
                     }
-                    // Reset position
                     e.target.position({ x: 0, y: 0 })
                   }}
                 >
                   <DeskShape
-                    x={x} y={y} w={CELL_W} h={CELL_H}
+                    x={pos.x} y={pos.y} w={CELL_W} h={CELL_H}
                     occupied={!!aluno}
                     studentName={aluno?.nome}
                     studentNum={aluno?.numero}
                     isDragOver={isOver}
+                    selected={selected}
+                    connections={connections}
                   />
                 </Group>
               )

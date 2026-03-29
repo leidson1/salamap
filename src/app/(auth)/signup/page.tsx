@@ -1,13 +1,11 @@
 "use client";
 
-
 import { useState } from "react";
 import Link from "next/link";
+import { AlertTriangle, LayoutGrid, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -16,7 +14,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, LayoutGrid } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/client";
+import {
+  getSupabaseConfigHelpText,
+  getSupabaseConfigStatus,
+} from "@/lib/supabase/config";
 
 export default function SignUpPage() {
   const [nome, setNome] = useState("");
@@ -25,9 +29,19 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const supabaseConfig = getSupabaseConfigStatus();
+  const supabaseConfigHelp = getSupabaseConfigHelpText();
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
+
+    const normalizedNome = nome.trim();
+    const normalizedEmail = email.trim();
+
+    if (!normalizedNome) {
+      toast.error("Informe seu nome.");
+      return;
+    }
 
     if (password !== confirmPassword) {
       toast.error("As senhas nao coincidem");
@@ -39,50 +53,77 @@ export default function SignUpPage() {
       return;
     }
 
-    setLoading(true);
-
-    const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          nome,
-        },
-      },
-    });
-
-    if (error) {
-      let msg = error.message;
-      if (error.message.includes("already registered")) {
-        msg = "Este email ja esta cadastrado. Tente fazer login.";
-      } else if (error.message.includes("Password should be")) {
-        msg = "A senha deve ter pelo menos 6 caracteres.";
-      }
-      toast.error("Erro ao criar conta", {
-        description: msg,
+    if (!supabaseConfig.isConfigured) {
+      toast.error("Supabase nao configurado", {
+        description: supabaseConfigHelp,
       });
-      setLoading(false);
       return;
     }
 
-    toast.success("Conta criada com sucesso!", {
-      description: "Verifique seu e-mail para confirmar o cadastro.",
-    });
-    setLoading(false);
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+      const acceptedTermsAt = new Date().toISOString();
+      const { error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          data: {
+            nome: normalizedNome,
+            accepted_terms_at: acceptedTermsAt,
+          },
+        },
+      });
+
+      if (error) {
+        let msg = error.message;
+        if (error.message.includes("already registered")) {
+          msg = "Este email ja esta cadastrado. Tente fazer login.";
+        } else if (error.message.includes("Password should be")) {
+          msg = "A senha deve ter pelo menos 6 caracteres.";
+        } else if (error.message.includes("is invalid")) {
+          msg = "Informe um email valido para concluir o cadastro.";
+        }
+
+        toast.error("Erro ao criar conta", {
+          description: msg,
+        });
+        return;
+      }
+
+      toast.success("Conta criada com sucesso!", {
+        description: "Verifique seu e-mail para confirmar o cadastro.",
+      });
+    } catch {
+      toast.error("Erro ao criar conta", {
+        description: "Nao foi possivel conectar ao Supabase. Revise a configuracao do .env.local.",
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <Card className="w-full max-w-md">
-      <CardHeader className="text-center space-y-2">
-        <div className="flex items-center justify-center gap-2 mb-2">
+      <CardHeader className="space-y-2 text-center">
+        <div className="mb-2 flex items-center justify-center gap-2">
           <LayoutGrid className="h-8 w-8 text-emerald-500" />
           <span className="text-2xl font-bold tracking-tight">SalaMap</span>
         </div>
         <CardTitle className="text-xl">Criar conta</CardTitle>
-        <CardDescription>
-          Preencha os dados abaixo para se cadastrar
-        </CardDescription>
+        <CardDescription>Preencha os dados abaixo para se cadastrar</CardDescription>
+        {!supabaseConfig.isConfigured && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-900">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-medium">Supabase nao configurado</p>
+                <p className="mt-1 text-amber-800">{supabaseConfigHelp}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </CardHeader>
 
       <form onSubmit={handleSignUp}>
@@ -118,7 +159,7 @@ export default function SignUpPage() {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="********"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -132,7 +173,7 @@ export default function SignUpPage() {
             <Input
               id="confirm-password"
               type="password"
-              placeholder="••••••••"
+              placeholder="********"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
@@ -153,7 +194,7 @@ export default function SignUpPage() {
               Li e aceito os{" "}
               <Link
                 href="/termos"
-                className="font-medium text-emerald-500 hover:text-emerald-400 transition-colors underline"
+                className="font-medium text-emerald-500 underline transition-colors hover:text-emerald-400"
                 target="_blank"
               >
                 Termos de Uso e Politica de Privacidade
@@ -173,12 +214,12 @@ export default function SignUpPage() {
           Ja tem conta?{" "}
           <Link
             href="/login"
-            className="font-medium text-emerald-500 hover:text-emerald-400 transition-colors"
+            className="font-medium text-emerald-500 transition-colors hover:text-emerald-400"
           >
             Entrar
           </Link>
         </p>
-        <p className="text-xs text-center text-muted-foreground/70">
+        <p className="text-center text-xs text-muted-foreground/70">
           Usa o ProvaScan? Sua conta funciona aqui tambem!
         </p>
       </CardFooter>

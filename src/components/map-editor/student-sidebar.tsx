@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { Search, UserRound } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -28,13 +29,18 @@ export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectS
   const placedCount = alunos.filter((a) => placedIds.includes(a.id)).length
 
   return (
-    <div className="flex flex-col rounded-lg border bg-white w-full lg:w-72 lg:shrink-0">
+    <div className="flex flex-col rounded-xl border bg-white w-full lg:w-80 lg:shrink-0 lg:sticky lg:top-4 lg:self-start">
       <div className="border-b p-3">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold">Alunos</h3>
-          <span className="text-xs text-muted-foreground">
-            {placedCount}/{alunos.length} posicionados
-          </span>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold">Lista de Alunos</h3>
+            <p className="text-xs text-muted-foreground">
+              Selecione um aluno ou arraste para o mapa.
+            </p>
+          </div>
+          <Badge variant="outline">
+            {placedCount}/{alunos.length}
+          </Badge>
         </div>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
@@ -52,7 +58,7 @@ export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectS
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5 max-h-[calc(100vh-320px)] lg:max-h-[calc(100vh-280px)]">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1.5 max-h-[calc(100vh-320px)] lg:max-h-[calc(100vh-220px)]">
         {unplacedAlunos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <UserRound className="size-8 text-muted-foreground/50" />
@@ -68,9 +74,15 @@ export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectS
           unplacedAlunos.map((aluno) => (
             <div
               key={aluno.id}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/plain', String(aluno.id))
+                e.dataTransfer.effectAllowed = 'move'
+                onSelectStudent?.(aluno.id)
+              }}
               onClick={() => onSelectStudent?.(selectedStudentId === aluno.id ? null : aluno.id)}
               className={cn(
-                'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-all select-none',
+                'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-grab active:cursor-grabbing transition-all select-none',
                 selectedStudentId === aluno.id
                   ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-300 shadow-md'
                   : 'bg-white hover:shadow-md hover:border-emerald-300'

@@ -1,14 +1,12 @@
 "use client";
 
-
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { AlertTriangle, LayoutGrid, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -17,67 +15,115 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, LayoutGrid } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/client";
+import {
+  getSupabaseConfigHelpText,
+  getSupabaseConfigStatus,
+} from "@/lib/supabase/config";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const supabaseConfig = getSupabaseConfigStatus();
+  const supabaseConfigHelp = getSupabaseConfigHelpText();
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const normalizedEmail = email.trim();
 
-    if (error) {
-      const msg =
-        error.message === "Invalid login credentials"
-          ? "Email ou senha incorretos. Verifique e tente novamente."
-          : error.message;
-      toast.error("Erro ao entrar", {
-        description: msg,
+    if (!supabaseConfig.isConfigured) {
+      toast.error("Supabase nao configurado", {
+        description: supabaseConfigHelp,
       });
-      setLoading(false);
       return;
     }
 
-    toast.success("Login realizado com sucesso!");
-    router.push("/dashboard");
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+
+      if (error) {
+        const msg =
+          error.message === "Invalid login credentials"
+            ? "Email ou senha incorretos. Verifique e tente novamente."
+            : error.message;
+
+        toast.error("Erro ao entrar", {
+          description: msg,
+        });
+        return;
+      }
+
+      toast.success("Login realizado com sucesso!");
+      router.push("/dashboard");
+    } catch {
+      toast.error("Erro ao entrar", {
+        description: "Nao foi possivel conectar ao Supabase. Revise a configuracao do .env.local.",
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleGoogleLogin() {
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/callback`,
-      },
-    });
+    if (!supabaseConfig.isConfigured) {
+      toast.error("Supabase nao configurado", {
+        description: supabaseConfigHelp,
+      });
+      return;
+    }
 
-    if (error) {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/callback`,
+        },
+      });
+
+      if (error) {
+        toast.error("Erro ao entrar com Google", {
+          description: error.message,
+        });
+      }
+    } catch {
       toast.error("Erro ao entrar com Google", {
-        description: error.message,
+        description: "Nao foi possivel conectar ao Supabase. Revise a configuracao do .env.local.",
       });
     }
   }
 
   return (
     <Card className="w-full max-w-md">
-      <CardHeader className="text-center space-y-2">
-        <div className="flex items-center justify-center gap-2 mb-2">
+      <CardHeader className="space-y-2 text-center">
+        <div className="mb-2 flex items-center justify-center gap-2">
           <LayoutGrid className="h-8 w-8 text-emerald-500" />
           <span className="text-2xl font-bold tracking-tight">SalaMap</span>
         </div>
         <CardTitle className="text-xl">Bem-vindo de volta</CardTitle>
-        <CardDescription>
-          Entre na sua conta para continuar
-        </CardDescription>
+        <CardDescription>Entre na sua conta para continuar</CardDescription>
+        {!supabaseConfig.isConfigured && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-900">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-medium">Supabase nao configurado</p>
+                <p className="mt-1 text-amber-800">{supabaseConfigHelp}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </CardHeader>
 
       <form onSubmit={handleEmailLogin}>
@@ -100,7 +146,7 @@ export default function LoginPage() {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="********"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -156,12 +202,12 @@ export default function LoginPage() {
           Nao tem conta?{" "}
           <Link
             href="/signup"
-            className="font-medium text-emerald-500 hover:text-emerald-400 transition-colors"
+            className="font-medium text-emerald-500 transition-colors hover:text-emerald-400"
           >
             Cadastre-se
           </Link>
         </p>
-        <p className="text-xs text-center text-muted-foreground/70">
+        <p className="text-center text-xs text-muted-foreground/70">
           Usa o ProvaScan? Sua conta funciona aqui tambem!
         </p>
       </CardFooter>

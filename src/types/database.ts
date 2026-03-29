@@ -31,6 +31,7 @@ export type CellType = 'carteira' | 'vazio' | 'bloqueado'
 export interface GridCell {
   tipo: CellType
   alunoId: number | null
+  blocoId?: string | null
 }
 
 export type Grid = GridCell[][]
@@ -93,6 +94,9 @@ export interface MapaHistorico {
   grid: Grid
   linhas: number
   colunas: number
+  layout_tipo: string
+  mesa_professor: { linha: number; coluna: number } | null
+  room_config: RoomConfig | null
   created_at: string
 }
 

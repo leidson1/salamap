@@ -161,7 +161,7 @@ export default function HomePage() {
               {
                 icon: LayoutGrid,
                 title: 'Layouts',
-                description: 'Tradicional, formato U ou grupos. Escolha o que funciona melhor.',
+                description: 'Fileiras, duplas, corredor central, formato U ou ilhas. Escolha o que funciona melhor.',
               },
             ].map((feature) => {
               const Icon = feature.icon

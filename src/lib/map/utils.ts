@@ -1,5 +1,18 @@
 import type { Grid, GridCell } from '@/types/database'
 
+export function createSoloBlockId(row: number, col: number): string {
+  return `solo-${row}-${col}`
+}
+
+export function getCellBlockId(
+  cell: GridCell | undefined,
+  row: number,
+  col: number
+): string | null {
+  if (!cell || cell.tipo !== 'carteira') return null
+  return cell.blocoId ?? createSoloBlockId(row, col)
+}
+
 export function resizeGrid(
   oldGrid: Grid,
   newLinhas: number,
@@ -12,7 +25,7 @@ export function resizeGrid(
       if (r < oldGrid.length && c < (oldGrid[r]?.length ?? 0)) {
         row.push({ ...oldGrid[r][c] })
       } else {
-        row.push({ tipo: 'carteira', alunoId: null })
+        row.push({ tipo: 'carteira', alunoId: null, blocoId: createSoloBlockId(r, c) })
       }
     }
     grid.push(row)

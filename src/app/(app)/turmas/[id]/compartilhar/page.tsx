@@ -62,7 +62,7 @@ export default function CompartilharPage() {
     } finally {
       setLoading(false)
     }
-  }, [turmaId])
+  }, [supabase, turmaId])
 
   useEffect(() => {
     fetchData()

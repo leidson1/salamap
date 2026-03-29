@@ -73,7 +73,7 @@ export default function TurmasPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [supabase])
 
   useEffect(() => {
     fetchTurmas()

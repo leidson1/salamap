@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { getCellBlockId } from '@/lib/map/utils'
 import { Ban } from 'lucide-react'
 import { ClassroomFrame } from '@/components/map-editor/classroom-frame'
 import type { Grid, RoomConfig } from '@/types/database'
@@ -19,6 +20,21 @@ function MiniChair({ muted = false }: { muted?: boolean }) {
       muted ? 'bg-stone-300/40' : 'bg-stone-400/80'
     )} />
   )
+}
+
+function getDeskConnections(grid: Grid, row: number, col: number) {
+  const blockId = getCellBlockId(grid[row]?.[col], row, col)
+
+  if (!blockId) {
+    return { left: false, right: false, top: false, bottom: false }
+  }
+
+  return {
+    left: getCellBlockId(grid[row]?.[col - 1], row, col - 1) === blockId,
+    right: getCellBlockId(grid[row]?.[col + 1], row, col + 1) === blockId,
+    top: getCellBlockId(grid[row - 1]?.[col], row - 1, col) === blockId,
+    bottom: getCellBlockId(grid[row + 1]?.[col], row + 1, col) === blockId,
+  }
 }
 
 export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridProps) {
@@ -46,10 +62,35 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
 
             // carteira
             const aluno = cell.alunoId ? alunoMap.get(cell.alunoId) : null
+            const connections = getDeskConnections(grid, rIdx, cIdx)
             return (
-              <div key={`${rIdx}-${cIdx}`} className="h-14 sm:h-16">
+              <div key={`${rIdx}-${cIdx}`} className="relative h-14 overflow-visible sm:h-16">
+                {connections.left && (
+                  <div className={cn(
+                    'absolute top-[10px] bottom-[18px] -left-1 w-2 rounded bg-amber-100 sm:top-[12px] sm:bottom-[20px]',
+                    !aluno && 'bg-amber-50/70'
+                  )} />
+                )}
+                {connections.right && (
+                  <div className={cn(
+                    'absolute top-[10px] bottom-[18px] -right-1 w-2 rounded bg-amber-100 sm:top-[12px] sm:bottom-[20px]',
+                    !aluno && 'bg-amber-50/70'
+                  )} />
+                )}
+                {connections.top && (
+                  <div className={cn(
+                    'absolute left-[10px] right-[10px] -top-1 h-2 rounded bg-amber-100',
+                    !aluno && 'bg-amber-50/70'
+                  )} />
+                )}
+                {connections.bottom && (
+                  <div className={cn(
+                    'absolute left-[10px] right-[10px] top-[36px] h-2 rounded bg-amber-100 sm:top-[44px]',
+                    !aluno && 'bg-amber-50/70'
+                  )} />
+                )}
                 <div className={cn(
-                  'flex items-center justify-center rounded-t-md rounded-b-sm px-1 text-center',
+                  'relative flex items-center justify-center rounded-t-md rounded-b-sm px-1 text-center',
                   'h-[42px] sm:h-[50px]',
                   aluno
                     ? 'bg-amber-100 border-2 border-amber-300 shadow-sm'

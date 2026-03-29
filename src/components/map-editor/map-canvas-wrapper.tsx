@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import type { FurnitureTool } from '@/lib/map/furniture-tools'
 import type { Grid, Aluno, RoomConfig } from '@/types/database'
 
 const MapCanvas = dynamic(
@@ -18,13 +19,18 @@ interface MapCanvasWrapperProps {
   linhas: number
   alunos: Aluno[]
   roomConfig?: RoomConfig | null
-  mode: 'alunos' | 'mobiliar'
+  mode: 'alunos' | 'mobiliar' | 'sala'
+  furnitureTool: FurnitureTool
   selectedStudentId?: number | null
+  selectedFurnitureBlockId?: string | null
+  selectedRoomElementId?: string | null
   onStudentPlace: (alunoId: number, row: number, col: number) => void
   onStudentRemove: (row: number, col: number) => void
   onCellSwap: (fromR: number, fromC: number, toR: number, toC: number) => void
-  onToggleCell: (row: number, col: number) => void
+  onFurnitureStamp: (row: number, col: number) => void
+  onFurnitureBlockSelect?: (blockId: string | null) => void
   onRoomConfigChange?: (config: RoomConfig) => void
+  onRoomElementSelect?: (elementId: string | null) => void
 }
 
 export function MapCanvasWrapper(props: MapCanvasWrapperProps) {

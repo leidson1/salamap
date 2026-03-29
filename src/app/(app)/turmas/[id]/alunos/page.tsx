@@ -68,7 +68,7 @@ export default function AlunosPage() {
     } finally {
       setLoading(false)
     }
-  }, [turmaId])
+  }, [supabase, turmaId])
 
   useEffect(() => {
     fetchData()

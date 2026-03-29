@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { getSupabaseConfigHelpText, getSupabaseConfigStatus } from '@/lib/supabase/config'
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
 import type { Profile } from '@/types/database'
@@ -10,6 +11,7 @@ import type { Profile } from '@/types/database'
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+  const supabaseConfig = getSupabaseConfigStatus()
   const supabase = createClient()
 
   const [user, setUser] = useState<Pick<Profile, 'nome' | 'email'> | null>(null)
@@ -17,6 +19,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function loadUser() {
+      if (!supabaseConfig.isConfigured) {
+        setLoading(false)
+        return
+      }
+
       const {
         data: { user: authUser },
       } = await supabase.auth.getUser()
@@ -72,6 +79,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!supabaseConfig.isConfigured) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+        <div className="w-full max-w-xl rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-950 shadow-sm">
+          <h1 className="text-lg font-semibold">Supabase nao configurado</h1>
+          <p className="mt-2 text-sm leading-6 text-amber-900">
+            {getSupabaseConfigHelpText()}
+          </p>
+          <p className="mt-3 text-sm text-amber-800">
+            Atualize o arquivo <code>.env.local</code> e reinicie o servidor de desenvolvimento.
+          </p>
         </div>
       </div>
     )
