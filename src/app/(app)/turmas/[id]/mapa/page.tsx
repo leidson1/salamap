@@ -364,8 +364,8 @@ export default function MapaEditorPage() {
     : mode === 'mobiliar'
       ? {
           label: 'Modo Carteiras',
-          title: 'Monte a sala por pecas, nao por celulas',
-          description: 'Use layouts base, compositor e a selecao de blocos para editar o mobiliario sem retrabalho.',
+          title: 'Monte a sala por blocos, nao por celulas',
+          description: 'Escolha um layout base no toolbar, crie blocos personalizados e ajuste com o inspetor.',
           accent: 'border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white',
           badge: 'bg-amber-100 text-amber-700',
         }
@@ -399,7 +399,7 @@ export default function MapaEditorPage() {
             {mode === 'alunos'
               ? 'Clique em um aluno e depois em uma carteira'
               : mode === 'mobiliar'
-                ? 'Selecione pecas, arraste blocos inteiros e ajuste o layout com ferramentas'
+                ? 'Crie e mova blocos de carteiras, ajuste tamanho e formato'
                 : 'Modele a sala arrastando quadro, mesa do professor, portas e janelas'}
           </p>
         </div>
@@ -429,7 +429,7 @@ export default function MapaEditorPage() {
                   {mode === 'alunos'
                     ? 'Posicione primeiro a estrutura da sala e depois distribua os alunos.'
                     : mode === 'mobiliar'
-                      ? 'Comece por um layout base, ajuste com o compositor e refine a peca selecionada.'
+                      ? 'Comece por um layout base, crie blocos e refine pelo inspetor lateral.'
                       : 'Resolva quadro e aberturas antes de mexer nas carteiras para evitar retrabalho.'}
                 </p>
               </div>
@@ -504,7 +504,7 @@ export default function MapaEditorPage() {
                     {mode === 'alunos'
                       ? 'O palco principal para distribuir a turma.'
                       : mode === 'mobiliar'
-                        ? 'Ajuste o mobiliario no canvas e refine pelo studio lateral.'
+                        ? 'Ajuste blocos no canvas e refine pelo painel lateral.'
                         : 'Arraste os elementos da sala diretamente aqui ou ajuste no painel.'}
                   </CardDescription>
                 </div>
@@ -547,12 +547,10 @@ export default function MapaEditorPage() {
           <FurnitureStudioPanel
             linhas={linhas}
             colunas={colunas}
-            currentLayout={layoutTipo}
             currentTool={furnitureTool}
             grid={grid}
             composerConfig={composerConfig}
             selectedBlockId={selectedFurnitureBlockId}
-            onApplyLayout={handleLayoutChange}
             onToolChange={handleFurnitureToolChange}
             onComposerConfigChange={handleComposerConfigChange}
             onResizeBlock={handleResizeSelectedBlock}

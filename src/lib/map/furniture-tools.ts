@@ -2,18 +2,17 @@ import type { Grid, GridCell } from '@/types/database'
 import { createSoloBlockId, getCellBlockId } from '@/lib/map/utils'
 
 export const FURNITURE_TOOLS = [
-  { value: 'move', label: 'Mover', description: 'Arraste blocos inteiros de mobiliario.' },
-  { value: 'custom-block', label: 'Compositor', description: 'Cria fileiras, grupos e bancadas parametrizadas.' },
-  { value: 'solo', label: '1 lugar', description: 'Insere uma carteira individual.' },
-  { value: 'dupla-h', label: 'Dupla H', description: 'Bloco horizontal com 2 lugares.' },
-  { value: 'dupla-v', label: 'Dupla V', description: 'Bloco vertical com 2 lugares.' },
-  { value: 'ilha-4', label: 'Ilha 4', description: 'Bloco de 4 lugares em 2x2.' },
+  { value: 'move', label: 'Mover', description: 'Arraste blocos inteiros pelo canvas.' },
+  { value: 'custom-block', label: 'Criar Bloco', description: 'Escolha tamanho e clique no canvas para inserir.' },
+  { value: 'apagar', label: 'Apagar', description: 'Clique em uma carteira para remover.' },
   { value: 'corredor', label: 'Corredor', description: 'Abre espaco de circulacao.' },
   { value: 'bloqueio', label: 'Bloqueio', description: 'Marca area indisponivel.' },
-  { value: 'apagar', label: 'Apagar', description: 'Remove qualquer mobiliario da area.' },
 ] as const
 
-export type FurnitureTool = typeof FURNITURE_TOOLS[number]['value']
+/** @deprecated Kept for backwards compatibility with saved grids. Use custom-block compositor instead. */
+export const LEGACY_FURNITURE_TOOLS = ['solo', 'dupla-h', 'dupla-v', 'ilha-4'] as const
+
+export type FurnitureTool = typeof FURNITURE_TOOLS[number]['value'] | typeof LEGACY_FURNITURE_TOOLS[number]
 
 export const FURNITURE_COMPOSER_PRESETS = [
   {

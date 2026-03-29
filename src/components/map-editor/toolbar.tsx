@@ -59,7 +59,10 @@ export function Toolbar({
     ? 'Selecione um aluno e clique em uma carteira para posicionar.'
     : mode === 'mobiliar'
       ? 'Use ferramentas para inserir blocos ou arraste blocos inteiros com Mover.'
-      : 'Arraste elementos no canvas ou ajuste tudo pelo studio lateral.'
+      : 'Arraste elementos no canvas ou ajuste tudo pelo painel lateral.'
+
+  const clearLabel = mode === 'alunos' ? 'Limpar Alunos' : mode === 'mobiliar' ? 'Limpar Carteiras' : 'Limpar'
+  const resetLabel = 'Resetar Layout'
 
   const commitLinhasChange = () => {
     const parsed = Number.parseInt(linhasInput, 10)
@@ -123,57 +126,61 @@ export function Toolbar({
 
       {/* Controls */}
       <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-white p-3">
-        <div className="space-y-1">
-          <Label className="text-xs">Linhas</Label>
-          <Input
-            type="number"
-            min={1}
-            max={12}
-            value={linhasInput}
-            onChange={(e) => setLinhasInput(e.target.value)}
-            onBlur={commitLinhasChange}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.currentTarget.blur()
-              }
-            }}
-            className="w-20 h-8 text-sm"
-          />
-        </div>
+        {mode === 'mobiliar' && (
+          <>
+            <div className="space-y-1">
+              <Label className="text-xs">Linhas</Label>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={linhasInput}
+                onChange={(e) => setLinhasInput(e.target.value)}
+                onBlur={commitLinhasChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur()
+                  }
+                }}
+                className="w-20 h-8 text-sm"
+              />
+            </div>
 
-        <div className="space-y-1">
-          <Label className="text-xs">Colunas</Label>
-          <Input
-            type="number"
-            min={1}
-            max={12}
-            value={colunasInput}
-            onChange={(e) => setColunasInput(e.target.value)}
-            onBlur={commitColunasChange}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.currentTarget.blur()
-              }
-            }}
-            className="w-20 h-8 text-sm"
-          />
-        </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Colunas</Label>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={colunasInput}
+                onChange={(e) => setColunasInput(e.target.value)}
+                onBlur={commitColunasChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur()
+                  }
+                }}
+                className="w-20 h-8 text-sm"
+              />
+            </div>
 
-        <div className="space-y-1">
-          <Label className="text-xs">Layout</Label>
-          <Select value={layoutTipo} onValueChange={(val) => { if (val) onLayoutChange(val) }}>
-            <SelectTrigger className="w-36 h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LAYOUT_OPTIONS.map((layout) => (
-                <SelectItem key={layout.value} value={layout.value}>
-                  {layout.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Layout</Label>
+              <Select value={layoutTipo} onValueChange={(val) => { if (val) onLayoutChange(val) }}>
+                <SelectTrigger className="w-36 h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LAYOUT_OPTIONS.map((layout) => (
+                    <SelectItem key={layout.value} value={layout.value}>
+                      {layout.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
 
         <div className="flex gap-1.5 ml-auto">
           {(onPrintMap || onPrintList) && (
@@ -198,13 +205,13 @@ export function Toolbar({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button variant="outline" size="sm" onClick={onClear} title="Limpar alunos">
+          <Button variant="outline" size="sm" onClick={onClear} title={clearLabel}>
             <Eraser className="size-3.5 mr-1" />
-            Limpar
+            {clearLabel}
           </Button>
-          <Button variant="outline" size="sm" onClick={onReset} title="Resetar layout">
+          <Button variant="outline" size="sm" onClick={onReset} title={resetLabel}>
             <RotateCcw className="size-3.5 mr-1" />
-            Resetar
+            {resetLabel}
           </Button>
           <Button size="sm" onClick={onSave}>
             {saveStatus === 'saving' ? (

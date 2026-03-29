@@ -172,7 +172,7 @@ export function RoomDesignerPanel({
           <CardHeader>
             <div className="flex items-center gap-2">
               <Sparkles className="size-4 text-emerald-600" />
-              <CardTitle>Studio da Sala</CardTitle>
+              <CardTitle>Painel da Sala</CardTitle>
             </div>
             <CardDescription>
               Defina frente da sala, mesa do professor e aberturas com menos cliques e mais previsibilidade.
