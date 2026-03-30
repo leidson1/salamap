@@ -13,6 +13,8 @@ interface MapPdfOptions {
   alunoMap: Map<number, { nome: string; numero: number | null }>
   shareUrl?: string
   roomConfig?: RoomConfig | null
+  escolaNome?: string
+  escolaLogoUrl?: string
 }
 
 // Colors
@@ -44,7 +46,7 @@ function rgb(c: readonly number[]): [number, number, number] {
 }
 
 export function generateMapPdf(options: MapPdfOptions) {
-  const { grid, linhas, colunas, serie, turma, turno, alunoMap, shareUrl, roomConfig } = options
+  const { grid, linhas, colunas, serie, turma, turno, alunoMap, shareUrl, roomConfig, escolaNome, escolaLogoUrl } = options
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
@@ -88,10 +90,32 @@ export function generateMapPdf(options: MapPdfOptions) {
   doc.setFillColor(...rgb(C.headerBg))
   doc.rect(0, 0, pageW, headerH, 'F')
 
+  let headerTextX = marginX + wallT + 2
+
+  // Logo da escola (se existir)
+  if (escolaLogoUrl) {
+    try {
+      doc.addImage(escolaLogoUrl, 'PNG', marginX + 2, 2, 14, 14)
+      headerTextX = marginX + 19
+    } catch {
+      // Logo nao carregou — continua sem
+    }
+  }
+
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(13)
   doc.setFont('helvetica', 'bold')
-  doc.text(`${serie} ${turma}`, marginX + wallT + 2, headerH / 2 + 1.5)
+
+  if (escolaNome) {
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
+    doc.text(escolaNome, headerTextX, headerH / 2 - 2)
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`${serie} ${turma}`, headerTextX, headerH / 2 + 4)
+  } else {
+    doc.text(`${serie} ${turma}`, headerTextX, headerH / 2 + 1.5)
+  }
 
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')

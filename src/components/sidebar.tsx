@@ -3,11 +3,11 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  LayoutDashboard,
+  Home,
   Users,
   LogOut,
   LayoutGrid,
-  Building2,
+  UsersRound,
 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/client'
@@ -35,9 +35,9 @@ export function SidebarContent({ user, currentPath }: SidebarProps) {
   }
 
   const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/dashboard', label: 'Inicio', icon: Home },
     { href: '/turmas', label: 'Turmas', icon: Users },
-    { href: '/escola', label: 'Escola', icon: Building2 },
+    { href: '/escola', label: 'Equipe', icon: UsersRound },
   ]
 
   return (

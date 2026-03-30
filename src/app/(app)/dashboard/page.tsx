@@ -7,10 +7,12 @@ import Link from 'next/link'
 import {
   Users, GraduationCap, LayoutGrid, Share2,
   Plus, Clock, MapPin, QrCode, Pencil, Eye,
+  FileDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import type { Grid, RoomConfig } from '@/types/database'
 
 interface TurmaWithDetails {
   id: number
@@ -149,6 +151,84 @@ export default function DashboardPage() {
   const totalMapas = turmas.filter(t => t.mapa).length
   const totalShared = turmas.filter(t => t.shareActive).length
 
+  const handleDownloadAllMaps = useCallback(async () => {
+    const turmasWithMaps = turmas.filter(t => t.mapa)
+    if (turmasWithMaps.length === 0) {
+      toast.error('Nenhum mapa criado ainda.')
+      return
+    }
+
+    toast.info('Gerando PDF de todos os mapas...')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    // Buscar dados completos de cada mapa
+    const turmaDataList = await Promise.all(turmasWithMaps.map(async (t) => {
+      const [mapaRes, alunosRes] = await Promise.all([
+        supabase.from('mapas').select('*').eq('turma_id', t.id).single(),
+        supabase.from('sala_alunos').select('id, nome, numero').eq('turma_id', t.id).eq('ativo', true),
+      ])
+      if (!mapaRes.data) return null
+      const m = mapaRes.data
+      return {
+        serie: t.serie, turma: t.turma, turno: t.turno,
+        grid: m.grid, linhas: m.linhas, colunas: m.colunas,
+        roomConfig: m.room_config,
+        alunoMap: new Map((alunosRes.data || []).map((a: { id: number; nome: string; numero: number | null }) => [Number(a.id), a])),
+      }
+    }))
+
+    const validTurmas = turmaDataList.filter(Boolean) as Array<{
+      serie: string; turma: string; turno: string; grid: Grid; linhas: number; colunas: number
+      roomConfig: RoomConfig | null; alunoMap: Map<number, { nome: string; numero: number | null }>
+    }>
+
+    // Buscar nome/logo da escola
+    let escolaNome: string | undefined
+    let escolaLogoUrl: string | undefined
+    const { data: escolaData } = await supabase.from('escolas').select('nome, logo_url').eq('criado_por', user.id).single()
+    if (escolaData) {
+      escolaNome = escolaData.nome
+      escolaLogoUrl = escolaData.logo_url || undefined
+    }
+
+    const { generateAllMapsPdf } = await import('@/lib/pdf/compile-generator')
+    generateAllMapsPdf({ turmas: validTurmas, escolaNome, escolaLogoUrl })
+  }, [turmas, supabase])
+
+  const handleDownloadAllLists = useCallback(async () => {
+    if (turmas.length === 0) return
+
+    toast.info('Gerando PDF de todas as listas...')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const turmaDataList = await Promise.all(turmas.map(async (t) => {
+      const { data: alunosData } = await supabase
+        .from('sala_alunos')
+        .select('id, nome, numero')
+        .eq('turma_id', t.id)
+        .eq('ativo', true)
+
+      return {
+        serie: t.serie, turma: t.turma, turno: t.turno,
+        grid: [], linhas: 0, colunas: 0,
+        alunoMap: new Map((alunosData || []).map((a: { id: number; nome: string; numero: number | null }) => [Number(a.id), a])),
+      }
+    }))
+
+    let escolaNome: string | undefined
+    let escolaLogoUrl: string | undefined
+    const { data: escolaData } = await supabase.from('escolas').select('nome, logo_url').eq('criado_por', user.id).single()
+    if (escolaData) {
+      escolaNome = escolaData.nome
+      escolaLogoUrl = escolaData.logo_url || undefined
+    }
+
+    const { generateAllStudentListsPdf } = await import('@/lib/pdf/compile-generator')
+    generateAllStudentListsPdf({ turmas: turmaDataList, escolaNome, escolaLogoUrl })
+  }, [turmas, supabase])
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -167,15 +247,29 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Inicio</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Visao geral das suas turmas e mapas
           </p>
         </div>
-        <Button render={<Link href="/turmas" />}>
-          <Plus className="size-4" data-icon="inline-start" />
-          Nova Turma
-        </Button>
+        <div className="flex items-center gap-2">
+          {turmas.length > 0 && (
+            <>
+              <Button variant="outline" size="sm" onClick={handleDownloadAllMaps}>
+                <FileDown className="size-3.5 mr-1" />
+                Todos os Mapas
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDownloadAllLists}>
+                <FileDown className="size-3.5 mr-1" />
+                Todas as Listas
+              </Button>
+            </>
+          )}
+          <Button render={<Link href="/turmas" />}>
+            <Plus className="size-4" data-icon="inline-start" />
+            Nova Turma
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}

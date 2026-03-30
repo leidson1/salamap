@@ -120,6 +120,7 @@ export interface Escola {
   id: number
   nome: string
   codigo_convite: string
+  logo_url: string | null
   criado_por: string
   created_at: string
 }

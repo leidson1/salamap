@@ -7,10 +7,12 @@ interface QrPosterOptions {
   turma: string
   turno: string
   updatedAt: string
+  escolaNome?: string
+  escolaLogoUrl?: string
 }
 
 export function generateQrPoster(options: QrPosterOptions) {
-  const { url, serie, turma, turno, updatedAt } = options
+  const { url, serie, turma, turno, updatedAt, escolaNome, escolaLogoUrl } = options
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
@@ -20,19 +22,34 @@ export function generateQrPoster(options: QrPosterOptions) {
   doc.setFillColor(5, 46, 22) // emerald-950
   doc.rect(0, 0, pageW, 65, 'F')
 
+  // Logo (se existir)
+  if (escolaLogoUrl) {
+    try {
+      doc.addImage(escolaLogoUrl, 'PNG', pageW / 2 - 8, 5, 16, 16)
+    } catch { /* logo nao carregou */ }
+  }
+
   // Title
   doc.setTextColor(255, 255, 255)
+  const titleStartY = escolaLogoUrl ? 28 : 22
+
+  if (escolaNome) {
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text(escolaNome, pageW / 2, titleStartY - 4, { align: 'center' })
+  }
+
   doc.setFontSize(14)
   doc.setFont('helvetica', 'normal')
-  doc.text('MAPA DE SALA', pageW / 2, 22, { align: 'center' })
+  doc.text('MAPA DE SALA', pageW / 2, titleStartY, { align: 'center' })
 
   doc.setFontSize(32)
   doc.setFont('helvetica', 'bold')
-  doc.text(`${serie} ${turma}`, pageW / 2, 42, { align: 'center' })
+  doc.text(`${serie} ${turma}`, pageW / 2, titleStartY + 18, { align: 'center' })
 
   doc.setFontSize(13)
   doc.setFont('helvetica', 'normal')
-  doc.text(`Turno: ${turno}`, pageW / 2, 56, { align: 'center' })
+  doc.text(`Turno: ${turno}`, pageW / 2, titleStartY + 30, { align: 'center' })
 
   // --- QR Code (grande e centralizado) ---
   const qrDataUrl = generateQrDataUrl(url, 800)

@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import Link from 'next/link'
 import {
   Building2, Plus, Users, Copy, UserPlus, LayoutGrid,
-  Clock, Crown, GraduationCap,
+  Clock, Crown, GraduationCap, Upload, ImageIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -163,7 +163,7 @@ export default function EscolaPage() {
         papel: 'coordenador',
       })
 
-      toast.success('Escola criada!')
+      toast.success('Equipe criada!')
       setCreateOpen(false)
       setNome('')
       fetchData()
@@ -224,9 +224,9 @@ export default function EscolaPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Escola</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Equipe</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Crie ou entre em uma escola para colaborar com outros professores
+            Crie ou entre em uma equipe para colaborar com outros professores
           </p>
         </div>
 
@@ -236,9 +236,9 @@ export default function EscolaPage() {
               <div className="rounded-full bg-emerald-100 p-4">
                 <Plus className="size-6 text-emerald-600" />
               </div>
-              <h3 className="mt-4 font-semibold">Criar Escola</h3>
+              <h3 className="mt-4 font-semibold">Criar Equipe</h3>
               <p className="mt-1 text-sm text-muted-foreground text-center">
-                Sou coordenador e quero criar o workspace da escola
+                Sou coordenador e quero criar o workspace da equipe
               </p>
             </CardContent>
           </Card>
@@ -248,9 +248,9 @@ export default function EscolaPage() {
               <div className="rounded-full bg-amber-100 p-4">
                 <UserPlus className="size-6 text-amber-600" />
               </div>
-              <h3 className="mt-4 font-semibold">Entrar em uma Escola</h3>
+              <h3 className="mt-4 font-semibold">Entrar em uma Equipe</h3>
               <p className="mt-1 text-sm text-muted-foreground text-center">
-                Tenho um codigo de convite do coordenador
+                Tenho um codigo de convite da equipe
               </p>
             </CardContent>
           </Card>
@@ -260,14 +260,14 @@ export default function EscolaPage() {
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Criar Escola</DialogTitle>
+              <DialogTitle>Criar Equipe</DialogTitle>
               <DialogDescription>
                 Apos criar, voce recebera um codigo para convidar professores.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Nome da Escola</Label>
+                <Label>Nome da Equipe / Escola</Label>
                 <Input
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
@@ -289,9 +289,9 @@ export default function EscolaPage() {
         <Dialog open={joinOpen} onOpenChange={setJoinOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Entrar em uma Escola</DialogTitle>
+              <DialogTitle>Entrar em uma Equipe</DialogTitle>
               <DialogDescription>
-                Digite o codigo de convite que voce recebeu do coordenador.
+                Digite o codigo de convite que voce recebeu.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -317,22 +317,123 @@ export default function EscolaPage() {
     )
   }
 
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !escola) return
+
+    const ext = file.name.split('.').pop()
+    const path = `${escola.id}/logo.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('escola-logos')
+      .upload(path, file, { upsert: true })
+
+    if (uploadError) {
+      toast.error('Erro ao enviar logo.')
+      console.error('[SalaMap] Logo upload error:', uploadError.message)
+      return
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('escola-logos')
+      .getPublicUrl(path)
+
+    const logo_url = urlData.publicUrl
+
+    const { error: updateError } = await supabase
+      .from('escolas')
+      .update({ logo_url })
+      .eq('id', escola.id)
+
+    if (updateError) {
+      toast.error('Erro ao salvar logo.')
+      return
+    }
+
+    setEscola({ ...escola, logo_url })
+    toast.success('Logo atualizado!')
+  }
+
+  async function handleNomeUpdate(novoNome: string) {
+    if (!escola || !novoNome.trim()) return
+
+    const { error } = await supabase
+      .from('escolas')
+      .update({ nome: novoNome.trim() })
+      .eq('id', escola.id)
+
+    if (error) {
+      toast.error('Erro ao atualizar nome.')
+      return
+    }
+
+    setEscola({ ...escola, nome: novoNome.trim() })
+    toast.success('Nome atualizado!')
+  }
+
   // Tem escola — mostrar dashboard
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{escola.nome}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Workspace da escola · {escola.membros.length} membro{escola.membros.length !== 1 ? 's' : ''}
-        </p>
+      <div className="flex items-center gap-4">
+        {escola.logo_url ? (
+          <img src={escola.logo_url} alt={escola.nome} className="h-12 w-12 rounded-lg object-cover border" />
+        ) : (
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-100">
+            <Building2 className="size-6 text-emerald-600" />
+          </div>
+        )}
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{escola.nome}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Equipe · {escola.membros.length} membro{escola.membros.length !== 1 ? 's' : ''}
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Perfil da equipe */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Perfil da Equipe</CardTitle>
+            <CardDescription>Nome e logo que aparecem nos PDFs e QR Codes</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-3">
+              {escola.logo_url ? (
+                <img src={escola.logo_url} alt="" className="h-14 w-14 rounded-lg object-cover border" />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-muted">
+                  <ImageIcon className="size-5 text-muted-foreground" />
+                </div>
+              )}
+              <div>
+                <label className="cursor-pointer">
+                  <Button variant="outline" size="sm" className="pointer-events-none">
+                    <Upload className="size-3 mr-1" />
+                    {escola.logo_url ? 'Trocar Logo' : 'Enviar Logo'}
+                  </Button>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                </label>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Nome</Label>
+              <Input
+                defaultValue={escola.nome}
+                onBlur={(e) => {
+                  if (e.target.value !== escola.nome) handleNomeUpdate(e.target.value)
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Codigo de convite */}
         <Card className="border-emerald-200/70">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Codigo de Convite</CardTitle>
-            <CardDescription>Compartilhe com professores da escola</CardDescription>
+            <CardDescription>Compartilhe com professores da equipe</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
