@@ -13,20 +13,13 @@ interface PublicGridProps {
   roomConfig?: RoomConfig | null
 }
 
-function MiniChair({ muted = false, rotacao = 0 }: { muted?: boolean; rotacao?: number }) {
-  const color = muted ? 'bg-stone-300/40' : 'bg-stone-400/80'
-
-  if (rotacao === 180) {
-    return <div className={cn('w-4 h-1.5 rounded-t-full mx-auto -mb-px', color)} />
-  }
-  if (rotacao === 90) {
-    return <div className={cn('w-1.5 h-4 rounded-l-full absolute -left-1 top-1/2 -translate-y-1/2', color)} />
-  }
-  if (rotacao === 270) {
-    return <div className={cn('w-1.5 h-4 rounded-r-full absolute -right-1 top-1/2 -translate-y-1/2', color)} />
-  }
-  // default: 0 (baixo)
-  return <div className={cn('w-4 h-1.5 rounded-b-full mx-auto -mt-px', color)} />
+function MiniChair({ occupied = false }: { occupied?: boolean }) {
+  return (
+    <div className={cn(
+      'w-5 h-1.5 rounded-b-full mx-auto',
+      occupied ? 'bg-slate-400/80' : 'bg-slate-300/50'
+    )} />
+  )
 }
 
 function getDeskConnections(grid: Grid, row: number, col: number) {
@@ -56,13 +49,13 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
         {grid.map((row, rIdx) =>
           row.map((cell, cIdx) => {
             if (cell.tipo === 'vazio') {
-              return <div key={`${rIdx}-${cIdx}`} className="h-14 sm:h-16" />
+              return <div key={`${rIdx}-${cIdx}`} className="h-[52px] sm:h-[60px]" />
             }
 
             if (cell.tipo === 'bloqueado') {
               return (
-                <div key={`${rIdx}-${cIdx}`} className="flex items-center justify-center rounded-md bg-stone-200/50 blocked-stripes h-14 sm:h-16">
-                  <Ban className="size-3 text-stone-400" />
+                <div key={`${rIdx}-${cIdx}`} className="flex items-center justify-center rounded-md bg-slate-100 border border-slate-200 h-[52px] sm:h-[60px]">
+                  <Ban className="size-3 text-slate-400" />
                 </div>
               )
             }
@@ -70,55 +63,62 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
             // carteira
             const aluno = cell.alunoId ? alunoMap.get(cell.alunoId) : null
             const connections = getDeskConnections(grid, rIdx, cIdx)
-            const rot = (cell.rotacao as number) || 0
+            const occupied = !!aluno
+
             return (
-              <div key={`${rIdx}-${cIdx}`} className="relative h-14 overflow-visible sm:h-16">
+              <div key={`${rIdx}-${cIdx}`} className="relative overflow-visible">
+                {/* Block connectors */}
                 {connections.left && (
                   <div className={cn(
-                    'absolute top-[10px] bottom-[18px] -left-1 w-2 rounded bg-amber-100 sm:top-[12px] sm:bottom-[20px]',
-                    !aluno && 'bg-amber-50/70'
+                    'absolute top-[6px] bottom-[14px] -left-1.5 w-2.5 rounded',
+                    occupied ? 'bg-green-50' : 'bg-white'
                   )} />
                 )}
                 {connections.right && (
                   <div className={cn(
-                    'absolute top-[10px] bottom-[18px] -right-1 w-2 rounded bg-amber-100 sm:top-[12px] sm:bottom-[20px]',
-                    !aluno && 'bg-amber-50/70'
+                    'absolute top-[6px] bottom-[14px] -right-1.5 w-2.5 rounded',
+                    occupied ? 'bg-green-50' : 'bg-white'
                   )} />
                 )}
                 {connections.top && (
                   <div className={cn(
-                    'absolute left-[10px] right-[10px] -top-1 h-2 rounded bg-amber-100',
-                    !aluno && 'bg-amber-50/70'
+                    'absolute left-[8px] right-[8px] -top-1.5 h-2.5 rounded',
+                    occupied ? 'bg-green-50' : 'bg-white'
                   )} />
                 )}
                 {connections.bottom && (
                   <div className={cn(
-                    'absolute left-[10px] right-[10px] top-[36px] h-2 rounded bg-amber-100 sm:top-[44px]',
-                    !aluno && 'bg-amber-50/70'
+                    'absolute left-[8px] right-[8px] bottom-[4px] h-2.5 rounded',
+                    occupied ? 'bg-green-50' : 'bg-white'
                   )} />
                 )}
-                {rot === 180 && <MiniChair muted={!aluno} rotacao={rot} />}
+
+                {/* Desk surface — sombra + mesa */}
                 <div className={cn(
-                  'relative flex items-center justify-center rounded-t-md rounded-b-sm px-1 text-center',
+                  'relative flex flex-col items-center justify-center rounded-md px-1 text-center shadow-sm',
                   'h-[42px] sm:h-[50px]',
-                  aluno
-                    ? 'bg-amber-100 border-2 border-amber-300 shadow-sm'
-                    : 'bg-amber-50/50 border border-dashed border-amber-200/60'
+                  occupied
+                    ? 'bg-green-50 border border-green-300'
+                    : 'bg-white border border-slate-200'
                 )}>
                   {aluno ? (
-                    <div className="truncate">
-                      <span className="text-[10px] sm:text-xs font-bold text-amber-700 block">
-                        {aluno.numero ?? '?'}
-                      </span>
-                      <span className="text-[8px] sm:text-[9px] text-amber-900 truncate block leading-tight">
+                    <>
+                      <div className="flex items-center justify-center w-5 h-5 rounded-full bg-green-700/10 mb-0.5">
+                        <span className="text-[10px] sm:text-xs font-bold text-green-700 leading-none">
+                          {aluno.numero ?? '?'}
+                        </span>
+                      </div>
+                      <span className="text-[8px] sm:text-[9px] text-gray-700 truncate block leading-tight max-w-full">
                         {aluno.nome.split(' ')[0]}
                       </span>
-                    </div>
+                    </>
                   ) : (
-                    <span className="text-[8px] text-amber-300/60">-</span>
+                    <span className="text-[8px] text-slate-300">—</span>
                   )}
                 </div>
-                {rot !== 180 && <MiniChair muted={!aluno} rotacao={rot} />}
+
+                {/* Chair */}
+                <MiniChair occupied={occupied} />
               </div>
             )
           })
