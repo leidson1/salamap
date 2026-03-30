@@ -212,8 +212,8 @@ export default function DashboardPage() {
 
       return {
         serie: t.serie, turma: t.turma, turno: t.turno,
-        grid: [], linhas: 0, colunas: 0,
-        alunoMap: new Map((alunosData || []).map((a: { id: number; nome: string; numero: number | null }) => [Number(a.id), a])),
+        grid: [] as Grid, linhas: 0, colunas: 0,
+        alunoMap: new Map<number, { nome: string; numero: number | null }>((alunosData || []).map((a: { id: number; nome: string; numero: number | null }) => [Number(a.id), a])),
       }
     }))
 
