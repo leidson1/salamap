@@ -7,16 +7,15 @@ import Link from 'next/link'
 import {
   Users, GraduationCap, LayoutGrid, Share2,
   Plus, Clock, MapPin, QrCode, Pencil, Eye,
-  FileDown, Copy, Building2, UserPlus,
+  FileDown, Copy,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { QrCodeCard } from '@/components/qr-code-card'
 import { useEscola } from '@/lib/escola-context'
+import { OnboardingWizard } from '@/components/onboarding-wizard'
 import type { Grid, RoomConfig } from '@/types/database'
 
 interface TurmaWithDetails {
@@ -51,145 +50,6 @@ function timeAgo(dateStr: string) {
   if (diffH < 24) return `${diffH}h`
   if (diffD < 30) return `${diffD}d`
   return date.toLocaleDateString('pt-BR')
-}
-
-// =====================
-// ONBOARDING: criar escola/equipe
-// =====================
-function OnboardingScreen() {
-  const supabase = createClient()
-  const { refreshEscola } = useEscola()
-  const [mode, setMode] = useState<'choice' | 'create' | 'join'>('choice')
-  const [nome, setNome] = useState('')
-  const [codigo, setCodigo] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  async function handleCreate() {
-    if (!nome.trim()) { toast.error('Digite o nome.'); return }
-    setSaving(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Nao autenticado.')
-      const { data, error } = await supabase.from('escolas').insert({ nome: nome.trim(), criado_por: user.id }).select().single()
-      if (error) throw error
-      await supabase.from('escola_membros').insert({ escola_id: data.id, user_id: user.id, papel: 'coordenador' })
-      toast.success('Escola criada!')
-      await refreshEscola()
-    } catch { toast.error('Erro ao criar.') }
-    finally { setSaving(false) }
-  }
-
-  async function handleJoin() {
-    if (!codigo.trim()) { toast.error('Digite o codigo.'); return }
-    setSaving(true)
-    try {
-      const { data, error } = await supabase.rpc('entrar_escola', { p_codigo: codigo.trim() })
-      if (error) throw error
-      if (!data) { toast.error('Codigo invalido.'); setSaving(false); return }
-      toast.success('Voce entrou na equipe!')
-      await refreshEscola()
-    } catch { toast.error('Erro ao entrar.') }
-    finally { setSaving(false) }
-  }
-
-  return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="w-full max-w-lg space-y-6">
-        <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100">
-            <LayoutGrid className="size-8 text-emerald-600" />
-          </div>
-          <h1 className="mt-4 text-2xl font-bold tracking-tight">Bem-vindo ao SalaMap!</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Para comecar, crie sua escola ou entre em uma equipe existente.
-          </p>
-        </div>
-
-        {mode === 'choice' && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Card className="cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all" onClick={() => setMode('create')}>
-              <CardContent className="flex flex-col items-center justify-center py-8">
-                <div className="rounded-full bg-emerald-100 p-4">
-                  <Building2 className="size-6 text-emerald-600" />
-                </div>
-                <h3 className="mt-3 font-semibold">Criar Escola</h3>
-                <p className="mt-1 text-xs text-muted-foreground text-center">
-                  Sou coordenador ou professor e quero comecar
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="cursor-pointer hover:border-amber-300 hover:shadow-md transition-all" onClick={() => setMode('join')}>
-              <CardContent className="flex flex-col items-center justify-center py-8">
-                <div className="rounded-full bg-amber-100 p-4">
-                  <UserPlus className="size-6 text-amber-600" />
-                </div>
-                <h3 className="mt-3 font-semibold">Entrar em uma Equipe</h3>
-                <p className="mt-1 text-xs text-muted-foreground text-center">
-                  Recebi um codigo de convite
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {mode === 'create' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Criar Escola / Equipe</CardTitle>
-              <CardDescription>
-                Depois de criar, voce podera convidar outros professores.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nome da Escola ou Equipe</Label>
-                <Input
-                  value={nome} onChange={(e) => setNome(e.target.value)}
-                  placeholder="Ex: Escola Municipal Dom Pedro II"
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                  autoFocus
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setMode('choice')}>Voltar</Button>
-                <Button onClick={handleCreate} disabled={saving} className="flex-1">
-                  {saving ? 'Criando...' : 'Criar e comecar'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {mode === 'join' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Entrar em uma Equipe</CardTitle>
-              <CardDescription>
-                Digite o codigo que voce recebeu do coordenador.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Codigo de Convite</Label>
-                <Input
-                  value={codigo} onChange={(e) => setCodigo(e.target.value)}
-                  placeholder="Ex: a1b2c3d4e5f6"
-                  onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-                  autoFocus
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setMode('choice')}>Voltar</Button>
-                <Button onClick={handleJoin} disabled={saving} className="flex-1">
-                  {saving ? 'Entrando...' : 'Entrar'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </div>
-  )
 }
 
 // =====================
@@ -306,7 +166,7 @@ export default function DashboardPage() {
   }, [turmas, supabase, escola])
 
   // Se nao tem escola, mostrar onboarding
-  if (!escola) return <OnboardingScreen />
+  if (!escola) return <OnboardingWizard />
 
   const totalAlunos = turmas.reduce((s, t) => s + t.alunoCount, 0)
   const totalMapas = turmas.filter(t => t.mapa).length
