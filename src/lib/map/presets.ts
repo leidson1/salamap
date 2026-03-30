@@ -161,3 +161,13 @@ export function clearStudentsFromGrid(grid: Grid): Grid {
     }))
   )
 }
+
+export function clearAllFurniture(linhas: number, colunas: number): Grid {
+  return Array.from({ length: linhas }, () =>
+    Array.from({ length: colunas }, () => ({
+      tipo: 'vazio' as const,
+      alunoId: null,
+      blocoId: null,
+    }))
+  )
+}

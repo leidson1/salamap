@@ -29,7 +29,7 @@ import {
   type FurnitureResizeAction,
   type FurnitureTool,
 } from '@/lib/map/furniture-tools'
-import { clearStudentsFromGrid, generateTradicional, getLayoutGenerator } from '@/lib/map/presets'
+import { clearAllFurniture, clearStudentsFromGrid, generateTradicional, getLayoutGenerator } from '@/lib/map/presets'
 import { normalizeRoomConfig } from '@/lib/map/room-config'
 import { createSoloBlockId, resizeGrid, getPlacedStudentIds } from '@/lib/map/utils'
 import type { Turma, Aluno, Grid, Mapa, RoomConfig } from '@/types/database'
@@ -323,6 +323,20 @@ export default function MapaEditorPage() {
   }, [grid, layoutTipo, linhas, colunas, triggerSave])
 
   const handleClear = useCallback(() => {
+    if (mode === 'mobiliar') {
+      const placedCount = getPlacedStudentIds(grid).length
+      const message = placedCount > 0
+        ? `Isso vai remover TODAS as carteiras e ${placedCount} aluno(s) posicionados. A sala ficara vazia. Continuar?`
+        : 'Isso vai remover todas as carteiras. A sala ficara vazia. Continuar?'
+      if (!window.confirm(message)) return
+
+      setGrid(clearAllFurniture(linhas, colunas))
+      setSelectedFurnitureBlockId(null)
+      setSelectedStudentId(null)
+      triggerSave()
+      return
+    }
+
     const placedCount = getPlacedStudentIds(grid).length
     if (placedCount === 0) return
     if (!window.confirm(`Limpar vai remover ${placedCount} aluno(s) posicionados do mapa. Continuar?`)) return
@@ -330,7 +344,7 @@ export default function MapaEditorPage() {
     setGrid(prev => clearStudentsFromGrid(prev))
     setSelectedStudentId(null)
     triggerSave()
-  }, [grid, triggerSave])
+  }, [mode, grid, linhas, colunas, triggerSave])
   const handleReset = useCallback(() => handleLayoutChange(layoutTipo), [layoutTipo, handleLayoutChange])
 
   const handleManualSave = useCallback(async () => {
