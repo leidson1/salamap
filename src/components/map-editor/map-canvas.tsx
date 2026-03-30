@@ -555,34 +555,41 @@ export function MapCanvas({
     return null
   }, [linhas, colunas, getCellPos])
 
+  // Calcula posicao no canvas compensando centralizacao do Stage
+  const getCanvasPos = useCallback((clientX: number, clientY: number) => {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    // O Stage esta centralizado — descontar o offset
+    const stageOffsetX = (rect.width - displayW) / 2
+    const px = (clientX - rect.left - stageOffsetX) / scale
+    const py = (clientY - rect.top) / scale
+    return { px, py }
+  }, [displayW, scale])
+
   // Handle HTML drag (from sidebar) into canvas
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const px = (e.clientX - rect.left) / scale
-    const py = (e.clientY - rect.top) / scale
-    const cell = getCellFromPos(px, py)
+    const pos = getCanvasPos(e.clientX, e.clientY)
+    if (!pos) return
+    const cell = getCellFromPos(pos.px, pos.py)
     setDragOverCell(cell)
-  }, [scale, getCellFromPos])
+  }, [getCanvasPos, getCellFromPos])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setDragOverCell(null)
     const alunoId = parseInt(e.dataTransfer.getData('text/plain'))
     if (isNaN(alunoId)) return
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const px = (e.clientX - rect.left) / scale
-    const py = (e.clientY - rect.top) / scale
-    const cell = getCellFromPos(px, py)
+    const pos = getCanvasPos(e.clientX, e.clientY)
+    if (!pos) return
+    const cell = getCellFromPos(pos.px, pos.py)
     if (cell) {
       const gridCell = grid[cell.r]?.[cell.c]
       if (gridCell && (gridCell.tipo === 'carteira' || gridCell.tipo === 'vazio') && !gridCell.alunoId) {
         onStudentPlace(alunoId, cell.r, cell.c)
       }
     }
-  }, [scale, getCellFromPos, grid, onStudentPlace])
+  }, [getCanvasPos, getCellFromPos, grid, onStudentPlace])
 
   const handleDragLeave = useCallback(() => setDragOverCell(null), [])
 
