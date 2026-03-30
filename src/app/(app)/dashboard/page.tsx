@@ -85,7 +85,7 @@ export default function DashboardPage() {
             const mapa = Array.isArray(raw) ? raw[0] : raw
             return mapa ? (mapa as { id: number }).id : null
           })
-          .filter((id): id is number => id !== null)
+          .filter((id: number | null): id is number => id !== null)
 
         if (mapaIds.length > 0) {
           const { data: sharesData } = await supabase
