@@ -1,6 +1,6 @@
 'use client'
 
-import { User, DoorOpen, Plus, X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { RoomConfig, WallElement, WallSide } from '@/types/database'
 import { DEFAULT_ROOM_CONFIG } from '@/types/database'
@@ -13,18 +13,38 @@ interface ClassroomFrameProps {
   onRoomConfigChange?: (config: RoomConfig) => void
 }
 
-function WallElementIcon({ el, compact, interactive, onRemove }: {
+// Tamanhos baseados no campo size do WallElement
+// Horizontal: width varia, height fixo
+// Vertical: height varia, width fixo
+const WALL_DEPTH = { compact: 28, normal: 36 }
+
+function getElementLength(el: WallElement, compact: boolean) {
+  const base = compact ? 24 : 32
+  const mult = el.size === 1 ? 0.7 : el.size === 3 ? 1.8 : 1
+  return Math.round(base * mult)
+}
+
+function WallElementIcon({ el, wall, compact, interactive, onRemove }: {
   el: WallElement
+  wall: WallSide
   compact?: boolean
   interactive?: boolean
   onRemove?: () => void
 }) {
-  const size = compact ? 'w-6 h-6' : 'w-8 h-8'
+  const isH = wall === 'top' || wall === 'bottom'
+  const len = getElementLength(el, !!compact)
+  const depth = compact ? WALL_DEPTH.compact - 6 : WALL_DEPTH.normal - 8
+
+  const w = isH ? len : depth
+  const h = isH ? depth : len
 
   if (el.type === 'porta') {
     return (
-      <div className={`${size} bg-stone-500/15 border border-stone-400/50 rounded-sm flex items-center justify-center relative group ${interactive ? 'cursor-move' : ''}`}>
-        <span className={`${compact ? 'text-[7px]' : 'text-[9px]'} font-bold text-stone-500`}>P</span>
+      <div
+        style={{ width: w, height: h }}
+        className={`bg-stone-500/15 border border-stone-400/50 rounded-sm flex items-center justify-center relative group shrink-0 ${interactive ? 'cursor-move' : ''}`}
+      >
+        <span className="text-[8px] font-bold text-stone-500">P</span>
         {interactive && onRemove && (
           <button onClick={(e) => { e.stopPropagation(); onRemove() }}
             className="absolute -top-1 -right-1 hidden group-hover:flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-white text-[8px]">
@@ -37,12 +57,15 @@ function WallElementIcon({ el, compact, interactive, onRemove }: {
 
   // janela
   return (
-    <div className={`${size} bg-sky-100/80 border border-sky-300/70 rounded-sm flex items-center justify-center relative group ${interactive ? 'cursor-move' : ''}`}>
+    <div
+      style={{ width: w, height: h }}
+      className={`bg-cyan-100/80 border border-cyan-300/70 rounded-sm relative group shrink-0 overflow-hidden ${interactive ? 'cursor-move' : ''}`}
+    >
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-px h-full bg-sky-300/50" />
+        <div className="w-px h-full bg-cyan-300/60" />
       </div>
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="h-px w-full bg-sky-300/50" />
+        <div className="h-px w-full bg-cyan-300/60" />
       </div>
       {interactive && onRemove && (
         <button onClick={(e) => { e.stopPropagation(); onRemove() }}
@@ -58,7 +81,7 @@ function AddButton({ onClick, compact }: { onClick: () => void; compact?: boolea
   return (
     <button
       onClick={onClick}
-      className={`${compact ? 'w-5 h-5' : 'w-7 h-7'} border border-dashed border-slate-300 rounded flex items-center justify-center hover:border-slate-400 hover:bg-slate-100 transition-colors`}
+      className={`${compact ? 'w-5 h-5' : 'w-7 h-7'} border border-dashed border-slate-300 rounded flex items-center justify-center hover:border-slate-400 hover:bg-slate-100 transition-colors shrink-0`}
     >
       <Plus className={compact ? 'size-2.5' : 'size-3'} style={{ color: '#94a3b8' }} />
     </button>
@@ -94,18 +117,18 @@ function TeacherArea({ position, compact, interactive, onPositionChange }: {
   }
 
   return (
-    <div className={`flex ${justifyClass} ${compact ? 'py-1 px-2' : 'py-2 px-4'}`}>
+    <div className={`flex ${justifyClass} ${compact ? 'py-1.5 px-3' : 'py-2.5 px-4'}`}>
       <div
         onClick={cycle}
         className={cn(
           'flex items-center justify-center rounded-md border shadow-sm',
-          compact ? 'px-3 py-1' : 'px-5 py-2',
+          compact ? 'px-4 py-1.5' : 'px-6 py-2.5',
           'bg-blue-50 border-blue-300',
           interactive && 'cursor-pointer hover:shadow-md hover:border-blue-400 transition-all'
         )}
         title={interactive ? 'Clique para mudar posicao da mesa' : undefined}
       >
-        <span className={`${compact ? 'text-[8px]' : 'text-[10px]'} font-bold text-blue-700`}>Professor</span>
+        <span className={`${compact ? 'text-[9px]' : 'text-[10px]'} font-bold text-blue-700`}>Professor</span>
       </div>
     </div>
   )
@@ -132,6 +155,7 @@ function WallWithElements({ wall, elements, compact, interactive, onAdd, onRemov
         <WallElementIcon
           key={el.id}
           el={el}
+          wall={wall}
           compact={compact}
           interactive={interactive}
           onRemove={interactive && onRemove ? () => onRemove(el.id) : undefined}
@@ -190,7 +214,7 @@ export function ClassroomFrame({
     })
   }
 
-  const wallThickness = compact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[36px]'
+  const wallT = compact ? `${WALL_DEPTH.compact}px` : `${WALL_DEPTH.normal}px`
   const boardAtTop = config.boardWall === 'top'
 
   return (
@@ -198,21 +222,21 @@ export function ClassroomFrame({
       <div className="flex flex-col">
 
         {/* TOP WALL */}
-        <div className={cn(
-          'bg-slate-200 flex items-center justify-center gap-2',
-          wallThickness
-        )}>
+        <div
+          className="bg-slate-200 flex items-center justify-center gap-2"
+          style={{ minHeight: wallT }}
+        >
           {boardAtTop && (
             <div
               onClick={handleBoardCycle}
               className={cn(
                 'bg-white border border-slate-400 rounded shadow-sm flex items-center justify-center',
-                compact ? 'h-4 px-6' : 'h-5 px-12',
+                compact ? 'h-5 px-10 sm:px-16' : 'h-6 px-16 sm:px-24',
                 interactive && 'cursor-pointer hover:shadow-md hover:border-slate-500 transition-all'
               )}
               title={interactive ? 'Clique para mover quadro' : undefined}
             >
-              <span className={`${compact ? 'text-[6px]' : 'text-[8px]'} font-bold text-slate-400 tracking-wider`}>
+              <span className={`${compact ? 'text-[7px] sm:text-[8px]' : 'text-[9px]'} font-bold text-slate-400 tracking-widest`}>
                 {config.boardLabel}
               </span>
             </div>
@@ -230,10 +254,10 @@ export function ClassroomFrame({
         {/* MIDDLE: left wall + content + right wall */}
         <div className="flex">
           {/* LEFT WALL */}
-          <div className={cn(
-            'bg-slate-200 flex flex-col items-center justify-center',
-            wallThickness
-          )}>
+          <div
+            className="bg-slate-200 flex flex-col items-center justify-center shrink-0"
+            style={{ minWidth: wallT }}
+          >
             <WallWithElements
               wall="left"
               elements={getWallElements('left')}
@@ -245,8 +269,7 @@ export function ClassroomFrame({
           </div>
 
           {/* INTERIOR */}
-          <div className="flex-1 flex flex-col border-x border-slate-300">
-            {/* Teacher area (after board) */}
+          <div className="flex-1 flex flex-col border-x border-slate-300/50">
             {boardAtTop && (
               <TeacherArea
                 position={config.teacherDesk}
@@ -256,17 +279,14 @@ export function ClassroomFrame({
               />
             )}
 
-            {/* Separator line */}
             {boardAtTop && config.teacherDesk !== 'none' && (
               <div className={`mx-3 border-t border-dashed border-slate-200 ${compact ? 'mb-1' : 'mb-2'}`} />
             )}
 
-            {/* Student grid */}
-            <div className={compact ? 'p-2' : 'p-3 sm:p-4'}>
+            <div className={compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4'}>
               {children}
             </div>
 
-            {/* Teacher area (if board at bottom) */}
             {!boardAtTop && config.teacherDesk !== 'none' && (
               <div className={`mx-3 border-t border-dashed border-slate-200 ${compact ? 'mt-1' : 'mt-2'}`} />
             )}
@@ -281,10 +301,10 @@ export function ClassroomFrame({
           </div>
 
           {/* RIGHT WALL */}
-          <div className={cn(
-            'bg-slate-200 flex flex-col items-center justify-center',
-            wallThickness
-          )}>
+          <div
+            className="bg-slate-200 flex flex-col items-center justify-center shrink-0"
+            style={{ minWidth: wallT }}
+          >
             <WallWithElements
               wall="right"
               elements={getWallElements('right')}
@@ -297,20 +317,20 @@ export function ClassroomFrame({
         </div>
 
         {/* BOTTOM WALL */}
-        <div className={cn(
-          'bg-slate-200 flex items-center justify-center gap-2',
-          wallThickness
-        )}>
+        <div
+          className="bg-slate-200 flex items-center justify-center gap-2"
+          style={{ minHeight: wallT }}
+        >
           {!boardAtTop && (
             <div
               onClick={handleBoardCycle}
               className={cn(
                 'bg-white border border-slate-400 rounded shadow-sm flex items-center justify-center',
-                compact ? 'h-4 px-6' : 'h-5 px-12',
+                compact ? 'h-5 px-10 sm:px-16' : 'h-6 px-16 sm:px-24',
                 interactive && 'cursor-pointer hover:shadow-md hover:border-slate-500 transition-all'
               )}
             >
-              <span className={`${compact ? 'text-[6px]' : 'text-[8px]'} font-bold text-slate-400 tracking-wider`}>
+              <span className={`${compact ? 'text-[7px] sm:text-[8px]' : 'text-[9px]'} font-bold text-slate-400 tracking-widest`}>
                 {config.boardLabel}
               </span>
             </div>
