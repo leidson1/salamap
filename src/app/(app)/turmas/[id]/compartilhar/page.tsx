@@ -213,6 +213,7 @@ export default function CompartilharPage() {
           </CardContent>
         </Card>
       ) : (
+        <>
         <div className="grid gap-6 lg:grid-cols-2">
           {/* QR Code */}
           <Card>
@@ -313,6 +314,7 @@ export default function CompartilharPage() {
             </div>
           </CardHeader>
         </Card>
+        </>
       )}
     </div>
   )
