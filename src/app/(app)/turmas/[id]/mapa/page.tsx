@@ -368,9 +368,9 @@ export default function MapaEditorPage() {
   const handlePrintMap = useCallback(() => {
     const alunoMap = new Map(alunos.map(a => [a.id, a]))
     import('@/lib/pdf/map-generator').then(({ generateMapPdf }) => {
-      generateMapPdf({ grid, linhas, colunas, serie: turma?.serie || '', turma: turma?.turma || '', turno: turma?.turno || '', alunoMap, shareUrl: shareUrl || undefined })
+      generateMapPdf({ grid, linhas, colunas, serie: turma?.serie || '', turma: turma?.turma || '', turno: turma?.turno || '', alunoMap, shareUrl: shareUrl || undefined, roomConfig })
     })
-  }, [grid, linhas, colunas, alunos, turma, shareUrl])
+  }, [grid, linhas, colunas, alunos, turma, shareUrl, roomConfig])
 
   const handlePrintList = useCallback(() => {
     import('@/lib/pdf/student-list-generator').then(({ generateStudentListPdf }) => {
