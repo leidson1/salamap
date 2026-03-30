@@ -160,7 +160,7 @@ export function ClassroomFrame({
     const position = Math.random() * 80 + 10
     onRoomConfigChange({
       ...config,
-      wallElements: [...wallElements, { id, type, wall, position }],
+      wallElements: [...wallElements, { id, type, wall, position, size: 2 as const }],
     })
   }
 
