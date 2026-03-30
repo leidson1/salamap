@@ -152,7 +152,7 @@ export function RoomDesignerPanel({
 
   const handleWallElementChange = (
     id: string,
-    patch: Partial<Pick<WallElement, 'type' | 'wall' | 'position'>>
+    patch: Partial<Pick<WallElement, 'type' | 'wall' | 'position' | 'size'>>
   ) => {
     onChange(updateWallElement(roomConfig, id, patch))
   }
