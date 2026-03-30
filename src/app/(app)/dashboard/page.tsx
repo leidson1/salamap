@@ -79,11 +79,13 @@ export default function DashboardPage() {
         // Buscar compartilhamentos separadamente (pode não existir)
         let shareMap = new Map<number, boolean>()
         const mapaIds = turmasData
-          .flatMap((t: Record<string, unknown>) => {
-            const mapas = t.mapas as Array<{ id: number }> | undefined
-            return mapas?.map(m => m.id) ?? []
+          .map((t: Record<string, unknown>) => {
+            // mapas pode ser objeto (relacao 1:1) ou array
+            const raw = t.mapas
+            const mapa = Array.isArray(raw) ? raw[0] : raw
+            return mapa ? (mapa as { id: number }).id : null
           })
-          .filter(Boolean)
+          .filter((id): id is number => id !== null)
 
         if (mapaIds.length > 0) {
           const { data: sharesData } = await supabase
@@ -101,8 +103,8 @@ export default function DashboardPage() {
 
         setTurmas(turmasData.map((t: Record<string, unknown>) => {
           const alunos = t.sala_alunos as Array<{ count: number }> | undefined
-          const mapas = t.mapas as Array<{ id: number; updated_at: string }> | undefined
-          const mapa = mapas?.[0] ?? null
+          const rawMapas = t.mapas
+          const mapa = (Array.isArray(rawMapas) ? rawMapas[0] : rawMapas) as { id: number; updated_at: string } | null
 
           return {
             id: t.id as number,
