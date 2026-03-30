@@ -193,13 +193,13 @@ export function RoomDesignerPanel({
 
             <div className="grid grid-cols-3 gap-2">
               <Button variant="outline" size="sm" onClick={() => handleApplyPreset('padrao')}>
-                Padrao
+                Padrão
               </Button>
               <Button variant="outline" size="sm" onClick={() => handleApplyPreset('corredor')}>
                 Corredor
               </Button>
               <Button variant="outline" size="sm" onClick={() => handleApplyPreset('laboratorio')}>
-                Laboratorio
+                Laboratório
               </Button>
             </div>
           </CardContent>
