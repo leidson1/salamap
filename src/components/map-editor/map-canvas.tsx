@@ -131,26 +131,18 @@ const COLORS = {
   windowBorder: '#7dd3fc',
 }
 
-function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, selected, connections, rotacao = 0 }: {
+function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, selected, connections }: {
   x: number; y: number; w: number; h: number
   occupied: boolean; studentName?: string; studentNum?: number | null
   isDragOver?: boolean
   selected?: boolean
   connections: DeskConnections
-  rotacao?: 0 | 90 | 180 | 270
 }) {
+  const deskH = h * 0.72
   const chairW = 18
   const chairH = 7
-  const chairGap = 2
   const connectorInsetX = 10
   const connectorInsetY = 8
-
-  // Mesa quadrada que cabe na celula mesmo girada
-  // Lado = menor dimensao - espaco da cadeira
-  const deskSide = Math.min(w, h) - chairH - chairGap - 4
-  // Offsets para centralizar a mesa+cadeira na celula
-  const offsetX = (w - deskSide) / 2
-  const offsetY = (h - deskSide - chairH - chairGap) / 2
 
   const bgColor = isDragOver ? COLORS.deskHighlight
     : selected ? '#fef3c7'
@@ -159,113 +151,98 @@ function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, 
     : selected ? '#f59e0b'
     : occupied ? COLORS.deskOccupiedBorder : COLORS.deskEmptyBorder
 
-  // Centro da celula para rotacao
-  const cx = w / 2
-  const cy = h / 2
-
   return (
     <Group x={x} y={y}>
-      <Group
-        offsetX={cx}
-        offsetY={cy}
-        x={cx}
-        y={cy}
-        rotation={rotacao}
-      >
-        {/* Posicionar mesa+cadeira a partir do offset */}
-        <Group x={offsetX} y={offsetY}>
-          {connections.left && (
-            <Rect
-              x={-BLOCK_CONNECTOR - offsetX}
-              y={connectorInsetY}
-              width={BLOCK_CONNECTOR + offsetX + 2}
-              height={deskSide - connectorInsetY * 2}
-              cornerRadius={4}
-              fill={bgColor}
-            />
-          )}
-          {connections.right && (
-            <Rect
-              x={deskSide - 2}
-              y={connectorInsetY}
-              width={BLOCK_CONNECTOR + offsetX + 2}
-              height={deskSide - connectorInsetY * 2}
-              cornerRadius={4}
-              fill={bgColor}
-            />
-          )}
-          {connections.top && (
-            <Rect
-              x={connectorInsetX}
-              y={-BLOCK_CONNECTOR - offsetY}
-              width={deskSide - connectorInsetX * 2}
-              height={BLOCK_CONNECTOR + offsetY + 2}
-              cornerRadius={4}
-              fill={bgColor}
-            />
-          )}
-          {connections.bottom && (
-            <Rect
-              x={connectorInsetX}
-              y={deskSide - 2}
-              width={deskSide - connectorInsetX * 2}
-              height={BLOCK_CONNECTOR + offsetY + 2}
-              cornerRadius={4}
-              fill={bgColor}
-            />
-          )}
-          {/* Shadow */}
-          <Rect
-            x={2} y={2} width={deskSide} height={deskSide}
-            cornerRadius={6}
-            fill="rgba(0,0,0,0.05)"
+      {connections.left && (
+        <Rect
+          x={-BLOCK_CONNECTOR}
+          y={connectorInsetY}
+          width={BLOCK_CONNECTOR + 2}
+          height={deskH - connectorInsetY * 2}
+          cornerRadius={4}
+          fill={bgColor}
+        />
+      )}
+      {connections.right && (
+        <Rect
+          x={w - 2}
+          y={connectorInsetY}
+          width={BLOCK_CONNECTOR + 2}
+          height={deskH - connectorInsetY * 2}
+          cornerRadius={4}
+          fill={bgColor}
+        />
+      )}
+      {connections.top && (
+        <Rect
+          x={connectorInsetX}
+          y={-BLOCK_CONNECTOR}
+          width={w - connectorInsetX * 2}
+          height={BLOCK_CONNECTOR + 2}
+          cornerRadius={4}
+          fill={bgColor}
+        />
+      )}
+      {connections.bottom && (
+        <Rect
+          x={connectorInsetX}
+          y={deskH - 2}
+          width={w - connectorInsetX * 2}
+          height={BLOCK_CONNECTOR + 2}
+          cornerRadius={4}
+          fill={bgColor}
+        />
+      )}
+      {/* Shadow */}
+      <Rect
+        x={2} y={3} width={w} height={deskH}
+        cornerRadius={6}
+        fill="rgba(0,0,0,0.05)"
+      />
+      {/* Desk surface */}
+      <Rect
+        width={w} height={deskH}
+        cornerRadius={6}
+        fill={bgColor}
+        stroke={borderColor}
+        strokeWidth={selected || occupied ? 2 : 1}
+      />
+      {/* Student info */}
+      {occupied && studentNum !== undefined && (
+        <>
+          <Circle
+            x={w / 2} y={deskH * 0.32}
+            radius={11}
+            fill={COLORS.studentNum} opacity={0.1}
           />
-          {/* Desk surface */}
-          <Rect
-            width={deskSide} height={deskSide}
-            cornerRadius={6}
-            fill={bgColor}
-            stroke={borderColor}
-            strokeWidth={selected || occupied ? 2 : 1}
+          <Text
+            x={0} y={deskH * 0.18} width={w}
+            text={String(studentNum ?? '?')}
+            fontSize={12} fontStyle="bold" fill={COLORS.studentNum}
+            align="center"
           />
-          {/* Student info */}
-          {occupied && studentNum !== undefined && (
-            <>
-              <Circle
-                x={deskSide / 2} y={deskSide * 0.3}
-                radius={11}
-                fill={COLORS.studentNum} opacity={0.1}
-              />
-              <Text
-                x={0} y={deskSide * 0.16} width={deskSide}
-                text={String(studentNum ?? '?')}
-                fontSize={12} fontStyle="bold" fill={COLORS.studentNum}
-                align="center"
-              />
-              <Text
-                x={4} y={deskSide * 0.5} width={deskSide - 8}
-                text={studentName?.split(' ')[0] ?? ''}
-                fontSize={10} fill={COLORS.studentName}
-                align="center" ellipsis wrap="none"
-              />
-            </>
-          )}
-          {isDragOver && (
-            <Text
-              x={0} y={deskSide * 0.35} width={deskSide}
-              text="Soltar aqui" fontSize={9} fill={COLORS.studentNum}
-              align="center"
-            />
-          )}
-          {/* Chair — always at bottom, Group rotation handles direction */}
-          <Rect
-            x={deskSide / 2 - chairW / 2} y={deskSide + chairGap}
-            width={chairW} height={chairH}
-            cornerRadius={[0, 0, 9, 9]}
-            fill={occupied ? COLORS.chair : COLORS.chairEmpty}
+          <Text
+            x={4} y={deskH * 0.52} width={w - 8}
+            text={studentName?.split(' ')[0] ?? ''}
+            fontSize={10} fill={COLORS.studentName}
+            align="center" ellipsis wrap="none"
           />
-        </Group>
-      </Group>
+        </>
+      )}
+      {isDragOver && (
+        <Text
+          x={0} y={deskH * 0.32} width={w}
+          text="Soltar aqui" fontSize={9} fill={COLORS.studentNum}
+          align="center"
+        />
+      )}
+      {/* Chair */}
+      <Rect
+        x={w / 2 - chairW / 2} y={deskH + 2}
+        width={chairW} height={chairH}
+        cornerRadius={[0, 0, 9, 9]}
+        fill={occupied ? COLORS.chair : COLORS.chairEmpty}
+      />
     </Group>
   )
 }
@@ -786,7 +763,6 @@ export function MapCanvas({
                     isDragOver={isOver}
                     selected={selected}
                     connections={connections}
-                    rotacao={(cell.rotacao as 0 | 90 | 180 | 270) || 0}
                   />
                 </Group>
               )

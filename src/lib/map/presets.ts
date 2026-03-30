@@ -11,10 +11,8 @@ export const LAYOUT_OPTIONS = [
 
 export type LayoutPreset = typeof LAYOUT_OPTIONS[number]['value']
 
-function cell(tipo: GridCell['tipo'], blocoId: string | null = null, rotacao?: 0 | 90 | 180 | 270): GridCell {
-  const c: GridCell = { tipo, alunoId: null, blocoId }
-  if (rotacao) c.rotacao = rotacao
-  return c
+function cell(tipo: GridCell['tipo'], blocoId: string | null = null): GridCell {
+  return { tipo, alunoId: null, blocoId }
 }
 
 function soloId(row: number, col: number) {
@@ -87,22 +85,8 @@ export function generateU(linhas: number, colunas: number): Grid {
   for (let r = 0; r < linhas; r++) {
     const row: GridCell[] = []
     for (let c = 0; c < colunas; c++) {
-      const isTop = r === 0
-      const isLeft = c === 0
-      const isRight = c === colunas - 1
-      const isEdge = isTop || isLeft || isRight
-
-      if (!isEdge) {
-        row.push(cell('vazio'))
-      } else {
-        // Cadeiras apontam pro centro do U
-        // rotacao 0=cadeira embaixo, 90=cadeira direita, 180=cadeira cima, 270=cadeira esquerda
-        const rot: 0 | 90 | 180 | 270 = isTop ? 0    // topo: cadeira pra baixo (centro)
-          : isLeft ? 90                                 // esquerda: cadeira pra direita (centro)
-          : isRight ? 270                               // direita: cadeira pra esquerda (centro)
-          : 0
-        row.push(cell('carteira', soloId(r, c), rot))
-      }
+      const isEdge = r === 0 || c === 0 || c === colunas - 1
+      row.push(isEdge ? cell('carteira', soloId(r, c)) : cell('vazio'))
     }
     grid.push(row)
   }
