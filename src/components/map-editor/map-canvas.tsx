@@ -433,10 +433,12 @@ function WallElements({ config, canvasW, canvasH, interactive, selectedElementId
         else { ex = canvasW - WALL_THICKNESS + 2; ey = WALL_THICKNESS + pos }
 
         if (el.type === 'porta') {
-          const baseW = isH ? 36 : WALL_THICKNESS - 6
-          const baseH = isH ? WALL_THICKNESS - 6 : 36
-          const pw = Math.round((isH ? baseW : baseW) * sizeMult)
-          const ph = Math.round((isH ? baseH : baseH) * sizeMult)
+          // Tamanho lateral (ao longo da parede) escala com size, espessura fica fixa
+          const wallDepth = WALL_THICKNESS - 6
+          const baseLen = 36
+          const scaledLen = Math.round(baseLen * sizeMult)
+          const pw = isH ? scaledLen : wallDepth
+          const ph = isH ? wallDepth : scaledLen
           return (
             <Group
               key={el.id}
@@ -473,10 +475,12 @@ function WallElements({ config, canvasW, canvasH, interactive, selectedElementId
             </Group>
           )
         }
-        const baseJW = isH ? 40 : WALL_THICKNESS - 6
-        const baseJH = isH ? WALL_THICKNESS - 6 : 40
-        const jw = Math.round((isH ? baseJW : baseJW) * sizeMult)
-        const jh = Math.round((isH ? baseJH : baseJH) * sizeMult)
+        // Janela: lateral escala, espessura fixa na parede
+        const jWallDepth = WALL_THICKNESS - 6
+        const baseJLen = 40
+        const scaledJLen = Math.round(baseJLen * sizeMult)
+        const jw = isH ? scaledJLen : jWallDepth
+        const jh = isH ? jWallDepth : scaledJLen
         return (
           <Group
             key={el.id}
