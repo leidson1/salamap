@@ -589,12 +589,28 @@ export function MapCanvas({
   return (
     <div
       ref={containerRef}
-      className="w-full flex justify-center"
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      onDragLeave={handleDragLeave}
+      className="w-full flex justify-center relative"
     >
-      <Stage
+      {/* Overlay transparente para capturar drag & drop HTML no modo alunos */}
+      {mode === 'alunos' && (
+        <div
+          className="absolute inset-0 z-10"
+          style={{ pointerEvents: dragOverCell ? 'auto' : 'none' }}
+          onDragOver={(e) => {
+            e.preventDefault()
+            handleDragOver(e)
+          }}
+          onDrop={handleDrop}
+          onDragLeave={handleDragLeave}
+        />
+      )}
+      <div
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onDragLeave={handleDragLeave}
+        onDragEnter={(e) => e.preventDefault()}
+      >
+        <Stage
         ref={stageRef}
         width={displayW}
         height={displayH}
@@ -770,6 +786,7 @@ export function MapCanvas({
           )}
         </Layer>
       </Stage>
+      </div>
     </div>
   )
 }

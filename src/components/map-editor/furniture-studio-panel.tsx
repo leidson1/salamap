@@ -251,30 +251,45 @@ export function FurnitureStudioPanel({
                 <div className="flex flex-wrap gap-2">
                   <Badge className="bg-amber-600 text-white hover:bg-amber-600">{selectedBlock.label}</Badge>
                   <Badge variant="outline">{selectedBlock.seats} lugares</Badge>
-                  <Badge variant="outline">{selectedBlock.width}x{selectedBlock.height}</Badge>
+                  {(selectedBlock.width > 1 || selectedBlock.height > 1) && (
+                    <Badge variant="outline">{selectedBlock.width}x{selectedBlock.height}</Badge>
+                  )}
                   {selectedBlock.occupiedSeats > 0 && (
                     <Badge variant="outline">{selectedBlock.occupiedSeats} com aluno</Badge>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" size="sm" onClick={() => onResizeBlock('grow-width')} disabled={!canGrowWidth}>
-                    + largura
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => onResizeBlock('grow-depth')} disabled={!canGrowDepth}>
-                    + profundidade
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => onResizeBlock('shrink-width')} disabled={!canShrinkWidth}>
-                    - largura
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => onResizeBlock('shrink-depth')} disabled={!canShrinkDepth}>
-                    - profundidade
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={onRotateBlock} disabled={!canRotate}>
-                    <RotateCw className="mr-1.5 size-3.5" /> Girar
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={onSplitBlock} disabled={!canSplit}>
-                    <GripVertical className="mr-1.5 size-3.5" /> Separar
-                  </Button>
+                  {/* Resize — só mostra se bloco > 1 lugar ou pode crescer */}
+                  {(canGrowWidth || canShrinkWidth) && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => onResizeBlock('grow-width')} disabled={!canGrowWidth}>
+                        + largura
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => onResizeBlock('shrink-width')} disabled={!canShrinkWidth}>
+                        - largura
+                      </Button>
+                    </>
+                  )}
+                  {(canGrowDepth || canShrinkDepth) && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => onResizeBlock('grow-depth')} disabled={!canGrowDepth}>
+                        + profundidade
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => onResizeBlock('shrink-depth')} disabled={!canShrinkDepth}>
+                        - profundidade
+                      </Button>
+                    </>
+                  )}
+                  {canRotate && (
+                    <Button variant="outline" size="sm" onClick={onRotateBlock}>
+                      <RotateCw className="mr-1.5 size-3.5" /> Girar
+                    </Button>
+                  )}
+                  {canSplit && (
+                    <Button variant="outline" size="sm" onClick={onSplitBlock}>
+                      <GripVertical className="mr-1.5 size-3.5" /> Separar
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={onClearSelection}>
                     Desselecionar
                   </Button>
