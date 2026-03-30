@@ -112,9 +112,7 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
                         {aluno.nome.split(' ')[0]}
                       </span>
                     </>
-                  ) : (
-                    <span className="text-[8px] text-slate-300">—</span>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Chair */}
