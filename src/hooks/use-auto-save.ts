@@ -35,8 +35,11 @@ export function useAutoSave(
       await saveFnRef.current()
       setSaveStatus('saved')
       resetStatusRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
-    } catch {
+    } catch (err) {
+      console.error('[SalaMap] Auto-save failed:', err)
       setSaveStatus('error')
+      // Manter status error por 5s antes de voltar pra idle
+      resetStatusRef.current = setTimeout(() => setSaveStatus('idle'), 5000)
     }
   }, [clearTimers])
 

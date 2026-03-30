@@ -77,20 +77,29 @@ export default function MapaEditorPage() {
 
   const saveFn = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      console.error('[SalaMap] Save failed: user not authenticated')
+      return
+    }
     if (mapa) {
       const { error } = await supabase.from('mapas').update({
         grid: JSON.parse(JSON.stringify(grid)),
         linhas, colunas, layout_tipo: layoutTipo, room_config: roomConfig,
       }).eq('id', mapa.id)
-      if (error) throw error
+      if (error) {
+        console.error('[SalaMap] Save update error:', error.message, error.details)
+        throw error
+      }
     } else {
       const { data, error } = await supabase.from('mapas').insert({
         user_id: user.id, turma_id: turmaId,
         grid: JSON.parse(JSON.stringify(grid)),
         linhas, colunas, layout_tipo: layoutTipo, room_config: roomConfig,
       }).select().single()
-      if (error) throw error
+      if (error) {
+        console.error('[SalaMap] Save insert error:', error.message, error.details)
+        throw error
+      }
       if (data) setMapa(data as Mapa)
     }
   }, [grid, linhas, colunas, layoutTipo, roomConfig, mapa, turmaId, supabase])
