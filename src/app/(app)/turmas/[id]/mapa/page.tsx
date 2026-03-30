@@ -58,6 +58,7 @@ export default function MapaEditorPage() {
   const [turma, setTurma] = useState<Turma | null>(null)
   const [alunos, setAlunos] = useState<Aluno[]>([])
   const [mapa, setMapa] = useState<Mapa | null>(null)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [grid, setGrid] = useState<Grid>([])
   const [linhas, setLinhas] = useState(5)
   const [colunas, setColunas] = useState(6)
@@ -112,6 +113,17 @@ export default function MapaEditorPage() {
           setMapa(m); setGrid(m.grid); setLinhas(m.linhas); setColunas(m.colunas)
           setLayoutTipo(m.layout_tipo)
           setRoomConfig(normalizeRoomConfig(m.room_config as RoomConfig | null))
+
+          // Buscar shareUrl se existir
+          const { data: shareData } = await supabase
+            .from('mapa_compartilhamentos')
+            .select('share_code')
+            .eq('mapa_id', m.id)
+            .eq('ativo', true)
+            .single()
+          if (shareData) {
+            setShareUrl(`${window.location.origin}/mapa/${shareData.share_code}`)
+          }
         } else {
           setGrid(generateTradicional(5, 6))
           setRoomConfig(normalizeRoomConfig(DEFAULT_ROOM_CONFIG))
@@ -354,9 +366,9 @@ export default function MapaEditorPage() {
   const handlePrintMap = useCallback(() => {
     const alunoMap = new Map(alunos.map(a => [a.id, a]))
     import('@/lib/pdf/map-generator').then(({ generateMapPdf }) => {
-      generateMapPdf({ grid, linhas, colunas, serie: turma?.serie || '', turma: turma?.turma || '', turno: turma?.turno || '', alunoMap })
+      generateMapPdf({ grid, linhas, colunas, serie: turma?.serie || '', turma: turma?.turma || '', turno: turma?.turno || '', alunoMap, shareUrl: shareUrl || undefined })
     })
-  }, [grid, linhas, colunas, alunos, turma])
+  }, [grid, linhas, colunas, alunos, turma, shareUrl])
 
   const handlePrintList = useCallback(() => {
     import('@/lib/pdf/student-list-generator').then(({ generateStudentListPdf }) => {

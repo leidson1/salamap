@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf'
+import { generateQrDataUrl } from '@/components/qr-code-card'
 import type { Grid } from '@/types/database'
 
 interface MapPdfOptions {
@@ -9,10 +10,11 @@ interface MapPdfOptions {
   turma: string
   turno: string
   alunoMap: Map<number, { nome: string; numero: number | null }>
+  shareUrl?: string
 }
 
 export function generateMapPdf(options: MapPdfOptions) {
-  const { grid, colunas, serie, turma, turno, alunoMap } = options
+  const { grid, colunas, serie, turma, turno, alunoMap, shareUrl } = options
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
@@ -31,7 +33,7 @@ export function generateMapPdf(options: MapPdfOptions) {
   const marginX = 15
   const marginY = 30
   const availW = pageW - marginX * 2
-  const availH = pageH - marginY - 15
+  const availH = pageH - marginY - 20
   const cellW = Math.min(availW / colunas, 40)
   const cellH = Math.min(availH / grid.length, 20)
   const gridW = cellW * colunas
@@ -73,10 +75,26 @@ export function generateMapPdf(options: MapPdfOptions) {
     })
   })
 
+  // QR Code no canto inferior direito (se tiver shareUrl)
+  if (shareUrl) {
+    const qrDataUrl = generateQrDataUrl(shareUrl, 400)
+    if (qrDataUrl) {
+      const qrSize = 22
+      const qrX = pageW - marginX - qrSize
+      const qrY = pageH - 8 - qrSize
+
+      doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize)
+
+      doc.setFontSize(5)
+      doc.setTextColor(120)
+      doc.text('Escaneie para ver o mapa atualizado', qrX + qrSize / 2, qrY - 1, { align: 'center' })
+    }
+  }
+
   // Footer
   doc.setFontSize(7)
   doc.setTextColor(150)
-  doc.text('Gerado pelo SalaMap - salamap.profdia.com.br', pageW / 2, pageH - 5, { align: 'center' })
+  doc.text('Gerado pelo SalaMap - salamap.profdia.com.br', 15, pageH - 5)
 
   doc.save(`mapa-${serie}-${turma}.pdf`)
 }
