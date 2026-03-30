@@ -60,41 +60,49 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Vincular convites pendentes (ignora se tabela nao existe)
-      await supabase.rpc('vincular_convites_pendentes').catch(() => {})
-
-      // Tentar query com compartilhamentos, fallback sem
-      let turmasData: Record<string, unknown>[] | null = null
-
-      const { data: fullData, error: fullError } = await supabase
+      // Query principal: turmas com alunos e mapas (tabelas que sempre existem)
+      const { data: turmasData, error: turmasError } = await supabase
         .from('sala_turmas')
-        .select('id, serie, turma, turno, sala_alunos(count), mapas(id, updated_at, mapa_compartilhamentos(id, ativo))')
+        .select('id, serie, turma, turno, sala_alunos(count), mapas(id, updated_at)')
         .eq('user_id', user.id)
         .eq('ativo', true)
         .order('serie')
         .order('turma')
 
-      if (fullError) {
-        // Fallback: query sem mapa_compartilhamentos (tabela pode nao existir)
-        const { data: basicData } = await supabase
-          .from('sala_turmas')
-          .select('id, serie, turma, turno, sala_alunos(count), mapas(id, updated_at)')
-          .eq('user_id', user.id)
-          .eq('ativo', true)
-          .order('serie')
-          .order('turma')
-
-        turmasData = basicData
-      } else {
-        turmasData = fullData
+      if (turmasError) {
+        console.error('[SalaMap] Dashboard error:', turmasError.message)
+        toast.error('Erro ao carregar dashboard.')
+        return
       }
 
       if (turmasData) {
-        setTurmas(turmasData.map((t) => {
+        // Buscar compartilhamentos separadamente (pode não existir)
+        let shareMap = new Map<number, boolean>()
+        const mapaIds = turmasData
+          .flatMap((t: Record<string, unknown>) => {
+            const mapas = t.mapas as Array<{ id: number }> | undefined
+            return mapas?.map(m => m.id) ?? []
+          })
+          .filter(Boolean)
+
+        if (mapaIds.length > 0) {
+          const { data: sharesData } = await supabase
+            .from('mapa_compartilhamentos')
+            .select('mapa_id, ativo')
+            .in('mapa_id', mapaIds)
+            .eq('ativo', true)
+
+          if (sharesData) {
+            for (const s of sharesData) {
+              shareMap.set(s.mapa_id as number, true)
+            }
+          }
+        }
+
+        setTurmas(turmasData.map((t: Record<string, unknown>) => {
           const alunos = t.sala_alunos as Array<{ count: number }> | undefined
-          const mapas = t.mapas as Array<{ id: number; updated_at: string; mapa_compartilhamentos?: Array<{ id: number; ativo: boolean }> }> | undefined
+          const mapas = t.mapas as Array<{ id: number; updated_at: string }> | undefined
           const mapa = mapas?.[0] ?? null
-          const shares = mapa?.mapa_compartilhamentos ?? []
 
           return {
             id: t.id as number,
@@ -103,31 +111,28 @@ export default function DashboardPage() {
             turno: t.turno as string,
             alunoCount: alunos?.[0]?.count ?? 0,
             mapa: mapa ? { id: mapa.id, updated_at: mapa.updated_at } : null,
-            shared: shares.length > 0,
-            shareActive: shares.some(s => s.ativo),
+            shared: mapa ? shareMap.has(mapa.id) : false,
+            shareActive: mapa ? shareMap.has(mapa.id) : false,
           }
         }))
       }
 
-      // Buscar turmas compartilhadas comigo (ignora se tabela nao existe)
-      try {
-        const { data: shared } = await supabase
-          .from('turma_compartilhamentos')
-          .select('id, turma_id, papel, turma:sala_turmas(serie, turma, turno), owner:profiles!convidado_por(nome)')
-          .eq('user_id', user.id)
-          .eq('status', 'aceito')
+      // Buscar turmas compartilhadas comigo (tabela pode não existir)
+      const { data: shared } = await supabase
+        .from('turma_compartilhamentos')
+        .select('id, turma_id, papel, turma:sala_turmas(serie, turma, turno), owner:profiles!convidado_por(nome)')
+        .eq('user_id', user.id)
+        .eq('status', 'aceito')
 
-        if (shared) {
-          setSharedTurmas(shared.map((s: Record<string, unknown>) => ({
-            ...s,
-            turma: Array.isArray(s.turma) ? s.turma[0] : s.turma,
-            owner: Array.isArray(s.owner) ? s.owner[0] : s.owner,
-          })) as SharedTurma[])
-        }
-      } catch {
-        // turma_compartilhamentos table may not exist yet
+      if (shared && Array.isArray(shared)) {
+        setSharedTurmas(shared.map((s: Record<string, unknown>) => ({
+          ...s,
+          turma: Array.isArray(s.turma) ? s.turma[0] : s.turma,
+          owner: Array.isArray(s.owner) ? s.owner[0] : s.owner,
+        })) as SharedTurma[])
       }
-    } catch {
+    } catch (err) {
+      console.error('[SalaMap] Dashboard catch:', err)
       toast.error('Erro ao carregar dashboard.')
     } finally {
       setLoading(false)
