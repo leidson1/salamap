@@ -516,7 +516,7 @@ export function MapCanvas({
   const [dragOverCell, setDragOverCell] = useState<{ r: number; c: number } | null>(null)
 
   const config = roomConfig ?? DEFAULT_ROOM_CONFIG
-  const alunoMap = new Map(alunos.map((a) => [a.id, a]))
+  const alunoMap = new Map(alunos.map((a) => [Number(a.id), a]))
   const { totalW, totalH } = getCanvasSize(linhas, colunas)
 
   useEffect(() => {
@@ -735,7 +735,7 @@ export function MapCanvas({
                 )
               }
 
-              const aluno = cell.alunoId ? alunoMap.get(cell.alunoId) : null
+              const aluno = cell.alunoId ? alunoMap.get(Number(cell.alunoId)) : null
               const isOver = dragOverCell?.r === rIdx && dragOverCell?.c === cIdx
               const connections = getDeskConnections(grid, rIdx, cIdx)
               const blockId = getCellBlockId(cell, rIdx, cIdx)

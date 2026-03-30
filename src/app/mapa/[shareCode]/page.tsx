@@ -46,8 +46,9 @@ export default async function PublicMapPage({ params }: PageProps) {
   }
 
   const mapData = data as PublicMapData
+  // Forcar Number() nas chaves pra evitar mismatch string/number do JSONB
   const alunoMap = new Map(
-    (mapData.alunos || []).map((a) => [a.id, a])
+    (mapData.alunos || []).map((a) => [Number(a.id), a])
   )
 
   const updatedAt = mapData.mapa.updated_at
@@ -57,7 +58,7 @@ export default async function PublicMapPage({ params }: PageProps) {
   const updatedAtRelative = updatedAt ? timeAgo(updatedAt) : null
 
   const placedCount = mapData.mapa.grid.reduce(
-    (sum, row) => sum + row.filter((c) => c.alunoId !== null).length, 0
+    (sum, row) => sum + row.filter((c) => c.alunoId != null).length, 0
   )
   const totalAlunos = mapData.alunos?.length ?? 0
 

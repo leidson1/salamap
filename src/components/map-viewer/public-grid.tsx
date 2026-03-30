@@ -61,7 +61,7 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
             }
 
             // carteira
-            const aluno = cell.alunoId ? alunoMap.get(cell.alunoId) : null
+            const aluno = cell.alunoId ? alunoMap.get(Number(cell.alunoId)) : null
             const connections = getDeskConnections(grid, rIdx, cIdx)
             const occupied = !!aluno
 
