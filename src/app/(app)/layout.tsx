@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getSupabaseConfigHelpText, getSupabaseConfigStatus } from '@/lib/supabase/config'
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
-import type { Profile } from '@/types/database'
+import { EscolaContext } from '@/lib/escola-context'
+import type { Profile, Escola } from '@/types/database'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -15,7 +16,46 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
 
   const [user, setUser] = useState<Pick<Profile, 'nome' | 'email'> | null>(null)
+  const [escola, setEscola] = useState<Escola | null>(null)
+  const [escolaChecked, setEscolaChecked] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const refreshEscola = useCallback(async () => {
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    if (!authUser) return
+
+    // Buscar escola onde sou criador
+    const { data: myEscola } = await supabase
+      .from('escolas')
+      .select('*')
+      .eq('criado_por', authUser.id)
+      .single()
+
+    if (myEscola) {
+      setEscola(myEscola as Escola)
+      setEscolaChecked(true)
+      return
+    }
+
+    // Buscar escola onde sou membro
+    const { data: membership } = await supabase
+      .from('escola_membros')
+      .select('escola:escolas(*)')
+      .eq('user_id', authUser.id)
+      .single()
+
+    if (membership) {
+      const escolaData = Array.isArray(membership.escola) ? membership.escola[0] : membership.escola
+      if (escolaData) {
+        setEscola(escolaData as Escola)
+        setEscolaChecked(true)
+        return
+      }
+    }
+
+    setEscola(null)
+    setEscolaChecked(true)
+  }, [supabase])
 
   useEffect(() => {
     async function loadUser() {
@@ -24,9 +64,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
+      const { data: { user: authUser } } = await supabase.auth.getUser()
 
       if (!authUser) {
         router.push('/login')
@@ -43,6 +81,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         setUser({ nome: profile.nome, email: profile.email })
       } else {
         setUser({ nome: '', email: authUser.email ?? '' })
+      }
+
+      // Carregar escola (pode falhar se tabela nao existe)
+      try {
+        await refreshEscola()
+      } catch {
+        setEscolaChecked(true)
       }
 
       setLoading(false)
@@ -103,16 +148,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!user) return null
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar user={user} currentPath={pathname} />
+    <EscolaContext value={{ escola, refreshEscola }}>
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar user={user} currentPath={pathname} escola={escola} />
 
-      <div className="flex flex-1 flex-col overflow-hidden lg:pl-0">
-        <Header user={user} currentPath={pathname} />
+        <div className="flex flex-1 flex-col overflow-hidden lg:pl-0">
+          <Header user={user} currentPath={pathname} />
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {children}
-        </main>
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </EscolaContext>
   )
 }

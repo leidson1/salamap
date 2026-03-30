@@ -7,10 +7,11 @@ import {
   Users,
   LogOut,
   LayoutGrid,
-  UsersRound,
+  Settings,
 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/client'
+import type { Escola } from '@/types/database'
 
 interface SidebarProps {
   user: {
@@ -18,9 +19,10 @@ interface SidebarProps {
     email: string
   }
   currentPath: string
+  escola?: Escola | null
 }
 
-export function SidebarContent({ user, currentPath }: SidebarProps) {
+export function SidebarContent({ user, currentPath, escola }: SidebarProps) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -37,19 +39,28 @@ export function SidebarContent({ user, currentPath }: SidebarProps) {
   const navItems = [
     { href: '/dashboard', label: 'Inicio', icon: Home },
     { href: '/turmas', label: 'Turmas', icon: Users },
-    { href: '/escola', label: 'Equipe', icon: UsersRound },
+    { href: '/escola', label: 'Configuracoes', icon: Settings },
   ]
 
   return (
     <div className="flex h-full flex-col bg-gradient-to-b from-emerald-950 via-emerald-900 to-emerald-800">
       {/* Brand */}
       <div className="flex items-center gap-3 px-5 py-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
-          <LayoutGrid className="h-5 w-5 text-white" />
+        {escola?.logo_url ? (
+          <img src={escola.logo_url} alt="" className="h-9 w-9 rounded-lg object-cover" />
+        ) : (
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
+            <LayoutGrid className="h-5 w-5 text-white" />
+          </div>
+        )}
+        <div className="min-w-0">
+          <span className="text-lg font-bold tracking-tight text-white block truncate">
+            {escola?.nome || 'SalaMap'}
+          </span>
+          {escola && (
+            <span className="text-[10px] text-emerald-300 block truncate">SalaMap</span>
+          )}
         </div>
-        <span className="text-xl font-bold tracking-tight text-white">
-          SalaMap
-        </span>
       </div>
 
       {/* Navigation */}
@@ -96,11 +107,11 @@ export function SidebarContent({ user, currentPath }: SidebarProps) {
   )
 }
 
-export function Sidebar({ user, currentPath }: SidebarProps) {
+export function Sidebar({ user, currentPath, escola }: SidebarProps) {
   return (
     <aside className="hidden w-64 shrink-0 lg:block">
       <div className="fixed inset-y-0 left-0 z-30 w-64">
-        <SidebarContent user={user} currentPath={currentPath} />
+        <SidebarContent user={user} currentPath={currentPath} escola={escola} />
       </div>
     </aside>
   )

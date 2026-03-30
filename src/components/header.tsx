@@ -9,6 +9,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { SidebarContent } from '@/components/sidebar'
+import { useEscola } from '@/lib/escola-context'
 
 interface HeaderProps {
   user: {
@@ -20,6 +21,8 @@ interface HeaderProps {
 }
 
 export function Header({ user, currentPath, title }: HeaderProps) {
+  const { escola } = useEscola()
+
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center border-b bg-white px-4 lg:hidden">
       <Sheet>
@@ -31,7 +34,7 @@ export function Header({ user, currentPath, title }: HeaderProps) {
         </SheetTrigger>
         <SheetContent side="left" showCloseButton={false} className="w-64 p-0">
           <SheetTitle className="sr-only">Menu de navegacao</SheetTitle>
-          <SidebarContent user={user} currentPath={currentPath} />
+          <SidebarContent user={user} currentPath={currentPath} escola={escola} />
         </SheetContent>
       </Sheet>
 
