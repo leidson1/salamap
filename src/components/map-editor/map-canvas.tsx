@@ -732,10 +732,16 @@ export function MapCanvas({
                   draggable={mode === 'mobiliar' && furnitureTool === 'move'}
                   onClick={() => {
                     if (mode === 'alunos') {
-                      if (selectedStudentId && !aluno && cell.tipo === 'carteira') {
+                      if (aluno && cell.alunoId) {
+                        if (selectedStudentId && selectedStudentId !== Number(cell.alunoId)) {
+                          // Tem outro aluno selecionado → move pra essa mesa (swap)
+                          onStudentPlace(selectedStudentId, rIdx, cIdx)
+                        } else {
+                          // Clicou num aluno → seleciona ou desseleciona
+                          onStudentRemove(rIdx, cIdx)
+                        }
+                      } else if (selectedStudentId && cell.tipo === 'carteira') {
                         onStudentPlace(selectedStudentId, rIdx, cIdx)
-                      } else if (aluno) {
-                        onStudentRemove(rIdx, cIdx)
                       }
                     } else if (mode === 'mobiliar') {
                       if (furnitureTool === 'move') {

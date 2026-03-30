@@ -186,9 +186,15 @@ export default function MapaEditorPage() {
   }, [grid, triggerSave])
 
   const handleStudentRemove = useCallback((row: number, col: number) => {
+    const removedAlunoId = grid[row]?.[col]?.alunoId
     const newGrid = grid.map(r => r.map(c => ({ ...c })))
     newGrid[row][col].alunoId = null
-    setGrid(newGrid); triggerSave()
+    setGrid(newGrid)
+    // Selecionar o aluno removido pra poder reposicionar
+    if (removedAlunoId) {
+      setSelectedStudentId(Number(removedAlunoId))
+    }
+    triggerSave()
   }, [grid, triggerSave])
 
   const handleCellSwap = useCallback((fR: number, fC: number, tR: number, tC: number) => {
@@ -599,6 +605,18 @@ export default function MapaEditorPage() {
             alunos={alunos} placedIds={placedIds}
             selectedStudentId={selectedStudentId}
             onSelectStudent={setSelectedStudentId}
+            onAddStudent={async (nome) => {
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) return
+              const numero = alunos.length + 1
+              const { data, error } = await supabase
+                .from('sala_alunos')
+                .insert({ nome, numero, turma_id: turmaId, user_id: user.id })
+                .select()
+                .single()
+              if (error) { toast.error('Erro ao adicionar aluno.'); throw error }
+              if (data) setAlunos(prev => [...prev, data as Aluno])
+            }}
           />
         )}
 

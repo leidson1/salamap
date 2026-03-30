@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
-import { Search, UserRound } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
+import { Search, UserRound, Plus, X } from 'lucide-react'
 import type { Aluno } from '@/types/database'
 
 interface StudentSidebarProps {
@@ -12,10 +13,14 @@ interface StudentSidebarProps {
   placedIds: number[]
   selectedStudentId?: number | null
   onSelectStudent?: (alunoId: number | null) => void
+  onAddStudent?: (nome: string) => Promise<void>
 }
 
-export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectStudent }: StudentSidebarProps) {
+export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectStudent, onAddStudent }: StudentSidebarProps) {
   const [search, setSearch] = useState('')
+  const [showAdd, setShowAdd] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [adding, setAdding] = useState(false)
 
   const unplacedAlunos = alunos
     .filter((a) => !placedIds.includes(a.id))
@@ -28,6 +33,17 @@ export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectS
 
   const placedCount = alunos.filter((a) => placedIds.includes(a.id)).length
 
+  async function handleAdd() {
+    if (!newName.trim() || !onAddStudent) return
+    setAdding(true)
+    try {
+      await onAddStudent(newName.trim())
+      setNewName('')
+      setShowAdd(false)
+    } catch { /* handled by parent */ }
+    finally { setAdding(false) }
+  }
+
   return (
     <div className="flex flex-col rounded-xl border bg-white w-full lg:w-80 lg:shrink-0 lg:sticky lg:top-4 lg:self-start">
       <div className="border-b p-3">
@@ -35,25 +51,55 @@ export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectS
           <div>
             <h3 className="text-sm font-semibold">Lista de Alunos</h3>
             <p className="text-xs text-muted-foreground">
-              Selecione um aluno ou arraste para o mapa.
+              Clique pra selecionar, depois clique na carteira.
             </p>
           </div>
           <Badge variant="outline">
             {placedCount}/{alunos.length}
           </Badge>
         </div>
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar aluno..."
-            className="pl-8 h-8 text-sm"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar aluno..."
+              className="pl-8 h-8 text-sm"
+            />
+          </div>
+          {onAddStudent && (
+            <Button
+              variant={showAdd ? 'default' : 'outline'}
+              size="sm"
+              className="h-8 shrink-0"
+              onClick={() => setShowAdd(!showAdd)}
+            >
+              {showAdd ? <X className="size-3.5" /> : <Plus className="size-3.5" />}
+            </Button>
+          )}
         </div>
+
+        {/* Adicionar aluno inline */}
+        {showAdd && onAddStudent && (
+          <div className="mt-2 flex gap-2">
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Nome do aluno"
+              className="h-8 text-sm"
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              autoFocus
+            />
+            <Button size="sm" className="h-8 shrink-0" onClick={handleAdd} disabled={adding || !newName.trim()}>
+              {adding ? '...' : 'Adicionar'}
+            </Button>
+          </div>
+        )}
+
         {selectedStudentId && (
           <p className="mt-2 text-xs text-emerald-600 font-medium">
-            Clique em uma carteira vazia para posicionar
+            Clique em uma carteira para posicionar
           </p>
         )}
       </div>
@@ -69,6 +115,11 @@ export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectS
                   ? 'Nenhum resultado'
                   : 'Todos posicionados!'}
             </p>
+            {alunos.length === 0 && onAddStudent && (
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => setShowAdd(true)}>
+                <Plus className="size-3.5 mr-1" /> Adicionar aluno
+              </Button>
+            )}
           </div>
         ) : (
           unplacedAlunos.map((aluno) => (
