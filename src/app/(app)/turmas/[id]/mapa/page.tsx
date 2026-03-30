@@ -235,6 +235,22 @@ export default function MapaEditorPage() {
     triggerSave()
   }, [grid, selectedFurnitureBlockId, triggerSave])
 
+  const handleRotateChairs = useCallback(() => {
+    if (!selectedFurnitureBlockId) return
+
+    const nextGrid = grid.map(r => r.map(c => {
+      if (c.blocoId === selectedFurnitureBlockId && c.tipo === 'carteira') {
+        const current = (c.rotacao || 0) as number
+        const next = ((current + 90) % 360) as 0 | 90 | 180 | 270
+        return { ...c, rotacao: next }
+      }
+      return { ...c }
+    }))
+
+    setGrid(nextGrid)
+    triggerSave()
+  }, [grid, selectedFurnitureBlockId, triggerSave])
+
   const handleSplitSelectedBlock = useCallback(() => {
     if (!selectedFurnitureBlockId) return
 
@@ -582,6 +598,7 @@ export default function MapaEditorPage() {
             onComposerConfigChange={handleComposerConfigChange}
             onResizeBlock={handleResizeSelectedBlock}
             onRotateBlock={handleRotateSelectedBlock}
+            onRotateChairs={handleRotateChairs}
             onSplitBlock={handleSplitSelectedBlock}
             onDeleteBlock={handleDeleteSelectedBlock}
             onClearSelection={() => setSelectedFurnitureBlockId(null)}

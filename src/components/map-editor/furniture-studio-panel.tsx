@@ -39,6 +39,7 @@ interface FurnitureStudioPanelProps {
   onComposerConfigChange: (config: FurnitureComposerConfig) => void
   onResizeBlock: (action: FurnitureResizeAction) => void
   onRotateBlock: () => void
+  onRotateChairs: () => void
   onSplitBlock: () => void
   onDeleteBlock: () => void
   onClearSelection: () => void
@@ -61,6 +62,7 @@ export function FurnitureStudioPanel({
   onComposerConfigChange,
   onResizeBlock,
   onRotateBlock,
+  onRotateChairs,
   onSplitBlock,
   onDeleteBlock,
   onClearSelection,
@@ -270,7 +272,10 @@ export function FurnitureStudioPanel({
                     - profundidade
                   </Button>
                   <Button variant="outline" size="sm" onClick={onRotateBlock} disabled={!canRotate}>
-                    <RotateCw className="mr-1.5 size-3.5" /> Girar
+                    <RotateCw className="mr-1.5 size-3.5" /> Girar Bloco
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={onRotateChairs}>
+                    <RotateCw className="mr-1.5 size-3.5" /> Girar Cadeiras
                   </Button>
                   <Button variant="outline" size="sm" onClick={onSplitBlock} disabled={!canSplit}>
                     <GripVertical className="mr-1.5 size-3.5" /> Separar
