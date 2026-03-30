@@ -43,6 +43,7 @@ export interface WallElement {
   type: 'porta' | 'janela'
   wall: WallSide
   position: number // 0-100 (percentage along the wall)
+  size: 1 | 2 | 3 // 1=pequeno, 2=medio, 3=grande
 }
 
 export interface RoomConfig {
@@ -57,10 +58,10 @@ export const DEFAULT_ROOM_CONFIG: RoomConfig = {
   boardLabel: 'Quadro',
   teacherDesk: 'center',
   wallElements: [
-    { id: 'porta-1', type: 'porta', wall: 'bottom', position: 10 },
-    { id: 'janela-1', type: 'janela', wall: 'left', position: 25 },
-    { id: 'janela-2', type: 'janela', wall: 'left', position: 50 },
-    { id: 'janela-3', type: 'janela', wall: 'left', position: 75 },
+    { id: 'porta-1', type: 'porta', wall: 'bottom', position: 10, size: 2 },
+    { id: 'janela-1', type: 'janela', wall: 'left', position: 25, size: 2 },
+    { id: 'janela-2', type: 'janela', wall: 'left', position: 50, size: 2 },
+    { id: 'janela-3', type: 'janela', wall: 'left', position: 75, size: 2 },
   ],
 }
 

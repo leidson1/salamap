@@ -46,11 +46,15 @@ export function normalizeWallElement(element: Partial<WallElement> | null | unde
     ? element.wall as WallSide
     : 'left'
 
+  const rawSize = typeof element.size === 'number' ? element.size : 2
+  const size = (rawSize >= 1 && rawSize <= 3 ? rawSize : 2) as 1 | 2 | 3
+
   return {
     id: element.id || createElementId(element.type),
     type: element.type,
     wall,
     position: clampWallPosition(typeof element.position === 'number' ? element.position : 50),
+    size,
   }
 }
 
@@ -85,12 +89,13 @@ function nextWallPosition(elements: WallElement[]) {
   return available ?? clampWallPosition(50 + elements.length * 10)
 }
 
-export function createWallElement(type: WallElement['type'], wall: WallSide, position?: number): WallElement {
+export function createWallElement(type: WallElement['type'], wall: WallSide, position?: number, size?: 1 | 2 | 3): WallElement {
   return {
     id: createElementId(type),
     type,
     wall,
     position: clampWallPosition(position ?? 50),
+    size: size ?? 2,
   }
 }
 
@@ -107,7 +112,7 @@ export function addWallElement(config: RoomConfig, type: WallElement['type'], wa
 export function updateWallElement(
   config: RoomConfig,
   id: string,
-  patch: Partial<Pick<WallElement, 'type' | 'wall' | 'position'>>
+  patch: Partial<Pick<WallElement, 'type' | 'wall' | 'position' | 'size'>>
 ) {
   return {
     ...config,
@@ -117,6 +122,7 @@ export function updateWallElement(
           ...element,
           ...patch,
           position: clampWallPosition(patch.position ?? element.position),
+          size: patch.size ?? element.size ?? 2,
         }
         : element
     ),

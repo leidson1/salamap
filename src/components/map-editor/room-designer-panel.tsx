@@ -125,7 +125,10 @@ function RoomElementButton({
         </Badge>
         <span className="text-sm font-medium">{WALL_SIDE_LABELS[element.wall]}</span>
       </div>
-      <span className="text-xs text-muted-foreground">{element.position}%</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] text-muted-foreground">{element.size === 1 ? 'P' : element.size === 3 ? 'G' : 'M'}</span>
+        <span className="text-xs text-muted-foreground">{element.position}%</span>
+      </div>
     </button>
   )
 }
@@ -238,6 +241,17 @@ export function RoomDesignerPanel({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tamanho</Label>
+                <ToggleGroup
+                  value={String(selectedWallElement.size ?? 2) as '1' | '2' | '3'}
+                  options={['1', '2', '3']}
+                  labels={{ '1': 'Pequeno', '2': 'Medio', '3': 'Grande' }}
+                  onChange={(size) => handleWallElementChange(selectedWallElement.id, { size: Number(size) as 1 | 2 | 3 })}
+                  className="grid-cols-3"
+                />
               </div>
 
               <div className="space-y-2">

@@ -422,6 +422,9 @@ function WallElements({ config, canvasW, canvasH, interactive, selectedElementId
         const isH = el.wall === 'top' || el.wall === 'bottom'
         const maxLen = isH ? canvasW - WALL_THICKNESS * 2 : canvasH - WALL_THICKNESS * 2
         const pos = (el.position / 100) * maxLen
+        const elSize = el.size ?? 2
+        // Size multipliers: 1=0.7x, 2=1x, 3=1.4x
+        const sizeMult = elSize === 1 ? 0.7 : elSize === 3 ? 1.4 : 1
 
         let ex = 0, ey = 0
         if (el.wall === 'top') { ex = WALL_THICKNESS + pos; ey = 2 }
@@ -430,8 +433,10 @@ function WallElements({ config, canvasW, canvasH, interactive, selectedElementId
         else { ex = canvasW - WALL_THICKNESS + 2; ey = WALL_THICKNESS + pos }
 
         if (el.type === 'porta') {
-          const pw = isH ? 28 : WALL_THICKNESS - 6
-          const ph = isH ? WALL_THICKNESS - 6 : 28
+          const baseW = isH ? 36 : WALL_THICKNESS - 6
+          const baseH = isH ? WALL_THICKNESS - 6 : 36
+          const pw = Math.round((isH ? baseW : baseW) * sizeMult)
+          const ph = Math.round((isH ? baseH : baseH) * sizeMult)
           return (
             <Group
               key={el.id}
@@ -468,8 +473,10 @@ function WallElements({ config, canvasW, canvasH, interactive, selectedElementId
             </Group>
           )
         }
-        const jw = isH ? 32 : WALL_THICKNESS - 6
-        const jh = isH ? WALL_THICKNESS - 6 : 32
+        const baseJW = isH ? 40 : WALL_THICKNESS - 6
+        const baseJH = isH ? WALL_THICKNESS - 6 : 40
+        const jw = Math.round((isH ? baseJW : baseJW) * sizeMult)
+        const jh = Math.round((isH ? baseJH : baseJH) * sizeMult)
         return (
           <Group
             key={el.id}
