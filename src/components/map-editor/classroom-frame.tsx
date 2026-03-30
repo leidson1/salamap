@@ -14,12 +14,10 @@ interface ClassroomFrameProps {
 }
 
 // Tamanhos baseados no campo size do WallElement
-// Horizontal: width varia, height fixo
-// Vertical: height varia, width fixo
 const WALL_DEPTH = { compact: 28, normal: 36 }
 
 function getElementLength(el: WallElement, compact: boolean) {
-  const base = compact ? 24 : 32
+  const base = compact ? 30 : 40
   const mult = el.size === 1 ? 0.7 : el.size === 3 ? 1.8 : 1
   return Math.round(base * mult)
 }
@@ -33,7 +31,7 @@ function WallElementIcon({ el, wall, compact, interactive, onRemove }: {
 }) {
   const isH = wall === 'top' || wall === 'bottom'
   const len = getElementLength(el, !!compact)
-  const depth = compact ? WALL_DEPTH.compact - 6 : WALL_DEPTH.normal - 8
+  const depth = compact ? WALL_DEPTH.compact - 4 : WALL_DEPTH.normal - 6
 
   const w = isH ? len : depth
   const h = isH ? depth : len
@@ -41,8 +39,13 @@ function WallElementIcon({ el, wall, compact, interactive, onRemove }: {
   if (el.type === 'porta') {
     return (
       <div
-        style={{ width: w, height: h }}
-        className={`bg-stone-500/15 border border-stone-400/50 rounded-sm flex items-center justify-center relative group shrink-0 ${interactive ? 'cursor-move' : ''}`}
+        style={{ width: w, height: h, position: 'absolute',
+          ...(wall === 'top' ? { left: `${el.position}%`, top: 2, transform: 'translateX(-50%)' } :
+              wall === 'bottom' ? { left: `${el.position}%`, bottom: 2, transform: 'translateX(-50%)' } :
+              wall === 'left' ? { top: `${el.position}%`, left: 2, transform: 'translateY(-50%)' } :
+              { top: `${el.position}%`, right: 2, transform: 'translateY(-50%)' })
+        }}
+        className={`bg-stone-500/15 border border-stone-400/60 rounded-sm flex items-center justify-center relative group shrink-0 ${interactive ? 'cursor-move' : ''}`}
       >
         <span className="text-[8px] font-bold text-stone-500">P</span>
         {interactive && onRemove && (
@@ -58,15 +61,14 @@ function WallElementIcon({ el, wall, compact, interactive, onRemove }: {
   // janela
   return (
     <div
-      style={{ width: w, height: h }}
-      className={`bg-cyan-100/80 border border-cyan-300/70 rounded-sm relative group shrink-0 overflow-hidden ${interactive ? 'cursor-move' : ''}`}
+      style={{ width: w, height: h, position: 'absolute',
+        ...(wall === 'top' ? { left: `${el.position}%`, top: 2, transform: 'translateX(-50%)' } :
+            wall === 'bottom' ? { left: `${el.position}%`, bottom: 2, transform: 'translateX(-50%)' } :
+            wall === 'left' ? { top: `${el.position}%`, left: 2, transform: 'translateY(-50%)' } :
+            { top: `${el.position}%`, right: 2, transform: 'translateY(-50%)' })
+      }}
+      className={`bg-cyan-200/60 border border-cyan-400/60 rounded-sm relative group shrink-0 ${interactive ? 'cursor-move' : ''}`}
     >
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-px h-full bg-cyan-300/60" />
-      </div>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="h-px w-full bg-cyan-300/60" />
-      </div>
       {interactive && onRemove && (
         <button onClick={(e) => { e.stopPropagation(); onRemove() }}
           className="absolute -top-1 -right-1 hidden group-hover:flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-white text-[8px]">
@@ -142,16 +144,10 @@ function WallWithElements({ wall, elements, compact, interactive, onAdd, onRemov
   onAdd?: (wall: WallSide, type: 'porta' | 'janela') => void
   onRemove?: (id: string) => void
 }) {
-  const isHorizontal = wall === 'top' || wall === 'bottom'
-  const sorted = [...elements].sort((a, b) => a.position - b.position)
-
+  // Elementos posicionados com position absolute (% do el.position)
   return (
-    <div className={cn(
-      'flex items-center gap-1',
-      isHorizontal ? 'flex-row justify-center' : 'flex-col justify-center',
-      compact ? 'p-0.5' : 'p-1'
-    )}>
-      {sorted.map(el => (
+    <>
+      {elements.map(el => (
         <WallElementIcon
           key={el.id}
           el={el}
@@ -162,12 +158,18 @@ function WallWithElements({ wall, elements, compact, interactive, onAdd, onRemov
         />
       ))}
       {interactive && onAdd && (
-        <div className={cn('flex gap-1', isHorizontal ? 'flex-row' : 'flex-col')}>
+        <div className={cn(
+          'absolute flex gap-1',
+          wall === 'top' ? 'right-2 top-1/2 -translate-y-1/2 flex-row' :
+          wall === 'bottom' ? 'right-2 top-1/2 -translate-y-1/2 flex-row' :
+          wall === 'left' ? 'bottom-1 left-1/2 -translate-x-1/2 flex-col' :
+          'bottom-1 right-1/2 translate-x-1/2 flex-col'
+        )}>
           <AddButton compact={compact} onClick={() => onAdd(wall, 'porta')} />
           <AddButton compact={compact} onClick={() => onAdd(wall, 'janela')} />
         </div>
       )}
-    </div>
+    </>
   )
 }
 
@@ -223,20 +225,20 @@ export function ClassroomFrame({
 
         {/* TOP WALL */}
         <div
-          className="bg-slate-200 flex items-center justify-center gap-2"
+          className="bg-slate-200 relative flex items-center justify-center"
           style={{ minHeight: wallT }}
         >
           {boardAtTop && (
             <div
               onClick={handleBoardCycle}
               className={cn(
-                'bg-white border border-slate-400 rounded shadow-sm flex items-center justify-center',
-                compact ? 'h-5 px-10 sm:px-16' : 'h-6 px-16 sm:px-24',
-                interactive && 'cursor-pointer hover:shadow-md hover:border-slate-500 transition-all'
+                'bg-white border-2 border-cyan-400/70 rounded shadow-sm flex items-center justify-center z-10',
+                compact ? 'h-5 w-[45%] max-w-[200px]' : 'h-6 w-[50%] max-w-[280px]',
+                interactive && 'cursor-pointer hover:shadow-md hover:border-cyan-500 transition-all'
               )}
               title={interactive ? 'Clique para mover quadro' : undefined}
             >
-              <span className={`${compact ? 'text-[7px] sm:text-[8px]' : 'text-[9px]'} font-bold text-slate-400 tracking-widest`}>
+              <span className={`${compact ? 'text-[7px] sm:text-[8px]' : 'text-[9px]'} font-bold text-slate-400 tracking-[0.15em]`}>
                 {config.boardLabel}
               </span>
             </div>
@@ -255,7 +257,7 @@ export function ClassroomFrame({
         <div className="flex">
           {/* LEFT WALL */}
           <div
-            className="bg-slate-200 flex flex-col items-center justify-center shrink-0"
+            className="bg-slate-200 relative shrink-0"
             style={{ minWidth: wallT }}
           >
             <WallWithElements
@@ -302,7 +304,7 @@ export function ClassroomFrame({
 
           {/* RIGHT WALL */}
           <div
-            className="bg-slate-200 flex flex-col items-center justify-center shrink-0"
+            className="bg-slate-200 relative shrink-0"
             style={{ minWidth: wallT }}
           >
             <WallWithElements
@@ -318,19 +320,19 @@ export function ClassroomFrame({
 
         {/* BOTTOM WALL */}
         <div
-          className="bg-slate-200 flex items-center justify-center gap-2"
+          className="bg-slate-200 relative flex items-center justify-center"
           style={{ minHeight: wallT }}
         >
           {!boardAtTop && (
             <div
               onClick={handleBoardCycle}
               className={cn(
-                'bg-white border border-slate-400 rounded shadow-sm flex items-center justify-center',
-                compact ? 'h-5 px-10 sm:px-16' : 'h-6 px-16 sm:px-24',
-                interactive && 'cursor-pointer hover:shadow-md hover:border-slate-500 transition-all'
+                'bg-white border-2 border-cyan-400/70 rounded shadow-sm flex items-center justify-center z-10',
+                compact ? 'h-5 w-[45%] max-w-[200px]' : 'h-6 w-[50%] max-w-[280px]',
+                interactive && 'cursor-pointer hover:shadow-md hover:border-cyan-500 transition-all'
               )}
             >
-              <span className={`${compact ? 'text-[7px] sm:text-[8px]' : 'text-[9px]'} font-bold text-slate-400 tracking-widest`}>
+              <span className={`${compact ? 'text-[7px] sm:text-[8px]' : 'text-[9px]'} font-bold text-slate-400 tracking-[0.15em]`}>
                 {config.boardLabel}
               </span>
             </div>
