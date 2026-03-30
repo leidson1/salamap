@@ -17,9 +17,9 @@ function timeAgo(dateStr: string) {
   const diffD = Math.floor(diffH / 24)
 
   if (diffMin < 1) return 'agora mesmo'
-  if (diffMin < 60) return `ha ${diffMin}min`
-  if (diffH < 24) return `ha ${diffH}h`
-  if (diffD < 7) return `ha ${diffD} dia${diffD > 1 ? 's' : ''}`
+  if (diffMin < 60) return `há${diffMin}min`
+  if (diffH < 24) return `há${diffH}h`
+  if (diffD < 7) return `há${diffD} dia${diffD > 1 ? 's' : ''}`
   return date.toLocaleDateString('pt-BR')
 }
 
@@ -36,9 +36,9 @@ export default async function PublicMapPage({ params }: PageProps) {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="text-center max-w-xs">
           <AlertCircle className="size-12 text-muted-foreground mx-auto" />
-          <h1 className="mt-4 text-xl font-semibold">Mapa nao encontrado</h1>
+          <h1 className="mt-4 text-xl font-semibold">Mapa não encontrado</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Este link pode estar expirado ou desativado. Peca ao professor um link atualizado.
+            Este link pode estar expirado ou desativado. Peça ao professor um link atualizado.
           </p>
         </div>
       </div>

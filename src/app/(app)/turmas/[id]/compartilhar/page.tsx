@@ -75,7 +75,7 @@ export default function CompartilharPage() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Usuario nao autenticado.')
+      if (!user) throw new Error('Usuário não autenticado.')
 
       const code = generateShareCode()
       const { data, error } = await supabase
@@ -166,7 +166,7 @@ export default function CompartilharPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <QrCode className="size-10 text-muted-foreground" />
             <p className="mt-4 text-sm text-muted-foreground">
-              Voce precisa criar o mapa de sala antes de compartilhar.
+              Você precisa criar o mapa de sala antes de compartilhar.
             </p>
             <Button
               className="mt-4"
@@ -252,7 +252,7 @@ export default function CompartilharPage() {
           {/* Settings */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Configuracoes</CardTitle>
+              <CardTitle className="text-lg">Configurações</CardTitle>
               <CardDescription>
                 Gerencie o compartilhamento do mapa
               </CardDescription>

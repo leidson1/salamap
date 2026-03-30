@@ -144,14 +144,14 @@ export default function LoginPage() {
 
       <CardFooter className="flex-col gap-2 pt-0">
         <p className="text-sm text-muted-foreground">
-          Nao tem conta?{" "}
+          Não tem conta?{" "}
           <Link href="/signup" className="font-medium text-emerald-500 hover:text-emerald-400">
             Cadastre-se
           </Link>
         </p>
         <div className="rounded-md bg-blue-50 px-3 py-1.5 text-center">
           <p className="text-[11px] text-blue-700">
-            Ja usa o <strong>ProvaScan</strong>? Use o mesmo login aqui!
+            Já usa o <strong>ProvaScan</strong>? Use o mesmo login aqui!
           </p>
         </div>
       </CardFooter>

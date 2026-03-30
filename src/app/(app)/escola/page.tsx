@@ -132,13 +132,13 @@ export default function EscolaPage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   async function handleJoinWithCode() {
-    if (!codigoConvite.trim()) { toast.error('Digite o codigo.'); return }
+    if (!codigoConvite.trim()) { toast.error('Digite o código.'); return }
     setJoining(true)
     try {
       const { data, error } = await supabase.rpc('entrar_escola', { p_codigo: codigoConvite.trim() })
       if (error) throw error
-      if (!data) { toast.error('Codigo invalido.'); setJoining(false); return }
-      toast.success('Voce entrou na equipe!')
+      if (!data) { toast.error('Código inválido.'); setJoining(false); return }
+      toast.success('Você entrou na equipe!')
       setCodigoConvite('')
       await refreshEscola()
       fetchData()
@@ -180,7 +180,7 @@ export default function EscolaPage() {
   function handleCopyCode() {
     if (currentEscola?.codigo_convite) {
       navigator.clipboard.writeText(currentEscola.codigo_convite)
-      toast.success('Codigo copiado!')
+      toast.success('Código copiado!')
     }
   }
 
@@ -196,7 +196,7 @@ export default function EscolaPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Configuracoes</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Gerencie sua escola, equipe e convites
         </p>
@@ -210,7 +210,7 @@ export default function EscolaPage() {
             <CardTitle className="text-sm">Entrar em outra equipe</CardTitle>
           </div>
           <CardDescription className="text-xs">
-            Recebeu um codigo de convite? Cole aqui para participar de outra escola.
+            Recebeu um código de convite? Cole aqui para participar de outra escola.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -218,7 +218,7 @@ export default function EscolaPage() {
             <Input
               value={codigoConvite}
               onChange={(e) => setCodigoConvite(e.target.value)}
-              placeholder="Codigo de convite"
+              placeholder="Código de convite"
               className="h-9 text-sm"
               onKeyDown={(e) => e.key === 'Enter' && handleJoinWithCode()}
             />
@@ -238,7 +238,7 @@ export default function EscolaPage() {
               <CardTitle className="text-sm">Minhas Equipes ({allEscolas.length})</CardTitle>
             </div>
             <CardDescription className="text-xs">
-              Voce participa de {allEscolas.length} equipe{allEscolas.length > 1 ? 's' : ''}.
+              Você participa de {allEscolas.length} equipe{allEscolas.length > 1 ? 's' : ''}.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -282,7 +282,7 @@ export default function EscolaPage() {
         </Card>
       )}
 
-      {/* Configuracoes da escola atual */}
+      {/* Configurações da escola atual */}
       {currentEscola && escolaDetails && (
         <>
           <Card>
@@ -318,10 +318,10 @@ export default function EscolaPage() {
             </CardContent>
           </Card>
 
-          {/* Codigo de convite */}
+          {/* Código de convite */}
           <Card className="border-emerald-200/70">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Codigo de Convite</CardTitle>
+              <CardTitle className="text-sm">Código de Convite</CardTitle>
               <CardDescription className="text-xs">Compartilhe com professores para entrarem na sua equipe</CardDescription>
             </CardHeader>
             <CardContent>

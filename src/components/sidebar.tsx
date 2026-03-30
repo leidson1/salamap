@@ -37,9 +37,9 @@ export function SidebarContent({ user, currentPath, escola }: SidebarProps) {
   }
 
   const navItems = [
-    { href: '/dashboard', label: 'Inicio', icon: Home },
-    { href: '/turmas', label: 'Turmas', icon: Users },
-    { href: '/escola', label: 'Configuracoes', icon: Settings },
+    { href: '/dashboard', label: 'Início', icon: Home },
+    { href: '/turmas', label: 'Minhas Turmas', icon: Users },
+    { href: '/escola', label: 'Configurações', icon: Settings },
   ]
 
   return (

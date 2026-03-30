@@ -19,7 +19,7 @@ import {
   Check, ChevronRight, UserPlus, Printer,
 } from 'lucide-react'
 
-const TURNOS = ['Manha', 'Tarde', 'Integral', 'Noite'] as const
+const TURNOS = ['Manhã', 'Tarde', 'Integral', 'Noite'] as const
 
 interface WizardData {
   escolaNome: string
@@ -48,7 +48,7 @@ export function OnboardingWizard() {
   const [saving, setSaving] = useState(false)
   const [data, setData] = useState<WizardData>({
     escolaNome: '', escolaId: null, logoUrl: null,
-    turmaId: null, serie: '', turma: '', turno: 'Manha',
+    turmaId: null, serie: '', turma: '', turno: 'Manhã',
     alunosTexto: '',
   })
 
@@ -61,7 +61,7 @@ export function OnboardingWizard() {
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Nao autenticado.')
+      if (!user) throw new Error('Não autenticado.')
       const { data: escola, error } = await supabase
         .from('escolas').insert({ nome: data.escolaNome.trim(), criado_por: user.id }).select().single()
       if (error) throw error
@@ -95,7 +95,7 @@ export function OnboardingWizard() {
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Nao autenticado.')
+      if (!user) throw new Error('Não autenticado.')
       const { data: turma, error } = await supabase
         .from('sala_turmas').insert({
           serie: data.serie.trim(), turma: data.turma.trim(), turno: data.turno, user_id: user.id,
@@ -112,7 +112,7 @@ export function OnboardingWizard() {
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Nao autenticado.')
+      if (!user) throw new Error('Não autenticado.')
       const nomes = data.alunosTexto
         .split('\n')
         .map(n => n.trim())
@@ -174,7 +174,7 @@ export function OnboardingWizard() {
                 </div>
                 <h2 className="mt-3 text-xl font-bold">Como se chama sua escola ou projeto?</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Pode ser o nome da escola, coordenacao ou um projeto pessoal.
+                  Pode ser o nome da escola, coordenação ou um projeto pessoal.
                 </p>
               </div>
               <div className="space-y-2">
@@ -205,7 +205,7 @@ export function OnboardingWizard() {
                 </div>
                 <h2 className="mt-3 text-xl font-bold">Quer adicionar um logo?</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Aparece nos PDFs e na pagina compartilhada. Voce pode fazer depois.
+                  Aparece nos PDFs e na página compartilhada. Você pode fazer depois.
                 </p>
               </div>
 
@@ -248,7 +248,7 @@ export function OnboardingWizard() {
                 </div>
                 <h2 className="mt-3 text-xl font-bold">Crie sua primeira turma</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Voce pode criar mais turmas depois.
+                  Você pode criar mais turmas depois.
                 </p>
               </div>
 
@@ -303,7 +303,7 @@ export function OnboardingWizard() {
                 </div>
                 <h2 className="mt-3 text-xl font-bold">Adicione os alunos</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Cole a lista de nomes (um por linha). Voce pode fazer depois tambem.
+                  Cole a lista de nomes (um por linha). Você pode fazer depois também.
                 </p>
               </div>
 
@@ -346,7 +346,7 @@ export function OnboardingWizard() {
                 </div>
                 <h2 className="mt-3 text-xl font-bold">Tudo pronto!</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {data.escolaNome} esta configurada. Veja o que voce pode fazer:
+                  {data.escolaNome} está configurada. Veja o que você pode fazer:
                 </p>
               </div>
 
@@ -403,7 +403,7 @@ export function OnboardingWizard() {
 
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => handleFinish(false)} className="flex-1">
-                  Ir para o Inicio
+                  Ir para o Início
                 </Button>
                 {data.turmaId && (
                   <Button onClick={() => handleFinish(true)} className="flex-1">

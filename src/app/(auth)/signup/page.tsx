@@ -50,7 +50,7 @@ export default function SignUpPage() {
       if (error) {
         let msg = error.message;
         if (error.message.includes("already registered")) {
-          msg = "Este email ja esta cadastrado. Tente fazer login.";
+          msg = "Este email já está cadastrado. Tente fazer login.";
         } else if (error.message.includes("Password should be")) {
           msg = "A senha deve ter pelo menos 6 caracteres.";
         }
@@ -93,7 +93,7 @@ export default function SignUpPage() {
         </div>
         <CardTitle className="text-lg">Criar conta</CardTitle>
         <CardDescription className="text-xs">
-          Rapido e gratuito. Comece em menos de 1 minuto.
+          Rápido e gratuito. Comece em menos de 1 minuto.
         </CardDescription>
       </CardHeader>
 
@@ -149,14 +149,14 @@ export default function SignUpPage() {
           <div className="space-y-1.5">
             <Label htmlFor="password" className="text-xs">Senha</Label>
             <Input
-              id="password" type="password" placeholder="Minimo 6 caracteres"
+              id="password" type="password" placeholder="Mínimo 6 caracteres"
               value={password} onChange={(e) => setPassword(e.target.value)}
               required minLength={6} autoComplete="new-password" className="h-10"
             />
           </div>
 
           <p className="text-[10px] text-muted-foreground">
-            Ao criar conta, voce aceita os{" "}
+            Ao criar conta, você aceita os{" "}
             <Link href="/termos" className="underline text-emerald-600" target="_blank">
               Termos de Uso
             </Link>.
@@ -171,14 +171,14 @@ export default function SignUpPage() {
 
       <CardFooter className="flex-col gap-2 pt-0">
         <p className="text-sm text-muted-foreground">
-          Ja tem conta?{" "}
+          Já tem conta?{" "}
           <Link href="/login" className="font-medium text-emerald-500 hover:text-emerald-400">
             Entrar
           </Link>
         </p>
         <div className="rounded-md bg-blue-50 px-3 py-1.5 text-center">
           <p className="text-[11px] text-blue-700">
-            Ja usa o <strong>ProvaScan</strong>? Use o mesmo login aqui!
+            Já usa o <strong>ProvaScan</strong>? Use o mesmo login aqui!
           </p>
         </div>
       </CardFooter>

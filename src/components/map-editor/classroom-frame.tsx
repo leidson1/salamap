@@ -128,7 +128,7 @@ function TeacherArea({ position, compact, interactive, onPositionChange }: {
           'bg-blue-50 border-blue-300',
           interactive && 'cursor-pointer hover:shadow-md hover:border-blue-400 transition-all'
         )}
-        title={interactive ? 'Clique para mudar posicao da mesa' : undefined}
+        title={interactive ? 'Clique para mudar posição da mesa' : undefined}
       >
         <span className={`${compact ? 'text-[9px]' : 'text-[10px]'} font-bold text-blue-700`}>Professor</span>
       </div>

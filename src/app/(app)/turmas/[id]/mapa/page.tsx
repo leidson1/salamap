@@ -79,7 +79,7 @@ export default function MapaEditorPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       console.error('[SalaMap] Save failed: user not authenticated')
-      throw new Error('Nao autenticado')
+      throw new Error('Não autenticado')
     }
     const payload = {
       grid: JSON.parse(JSON.stringify(grid)),
@@ -105,7 +105,7 @@ export default function MapaEditorPage() {
       }
       if (!updated) {
         console.error('[SalaMap] Save update: 0 rows affected. mapa.id=', mapa.id, 'user.id=', user.id)
-        throw new Error('Nenhuma linha atualizada — verifique permissoes do banco.')
+        throw new Error('Nenhuma linha atualizada — verifique permissões do banco.')
       }
     } else {
       const { data, error } = await supabase
@@ -201,7 +201,7 @@ export default function MapaEditorPage() {
     if (furnitureTool === 'move') {
       const nextGrid = moveFurnitureBlock(grid, fR, fC, tR, tC)
       if (nextGrid === grid) {
-        toast.error('Nao foi possivel mover essa peca para esse ponto.')
+        toast.error('Não foi possível mover essa peça para esse ponto.')
         return
       }
 
@@ -224,7 +224,7 @@ export default function MapaEditorPage() {
 
     const nextGrid = applyFurnitureTool(grid, row, col, furnitureTool, composerConfig)
     if (nextGrid === grid) {
-      toast.error('Essa peca precisa caber inteira e nao pode sobrescrever alunos.')
+      toast.error('Essa peça precisa caber inteira e não pode sobrescrever alunos.')
       return
     }
 
@@ -264,7 +264,7 @@ export default function MapaEditorPage() {
 
     const nextGrid = rotateFurnitureBlock(grid, selectedFurnitureBlockId)
     if (nextGrid === grid) {
-      toast.error('Nao foi possivel girar esse bloco nessa posicao.')
+      toast.error('Não foi possível girar esse bloco nessa posição.')
       return
     }
 
@@ -278,7 +278,7 @@ export default function MapaEditorPage() {
 
     const nextGrid = splitFurnitureBlock(grid, selectedFurnitureBlockId)
     if (nextGrid === grid) {
-      toast.error('Esse bloco ja esta separado em lugares individuais.')
+      toast.error('Esse bloco já está separado em lugares individuais.')
       return
     }
 
@@ -292,7 +292,7 @@ export default function MapaEditorPage() {
 
     const nextGrid = resizeFurnitureBlock(grid, selectedFurnitureBlockId, action)
     if (nextGrid === grid) {
-      toast.error('Nao foi possivel redimensionar esse bloco nessa direcao.')
+      toast.error('Não foi possível redimensionar esse bloco nessa direção.')
       return
     }
 
@@ -305,13 +305,13 @@ export default function MapaEditorPage() {
     const selectedBlock = getFurnitureBlockDetails(grid, selectedFurnitureBlockId)
 
     if (selectedBlock?.occupiedSeats) {
-      toast.error('Remova ou realoque os alunos antes de excluir essa peca.')
+      toast.error('Remova ou realoque os alunos antes de excluir essa peça.')
       return
     }
 
     const nextGrid = clearFurnitureBlock(grid, selectedFurnitureBlockId)
     if (nextGrid === grid) {
-      toast.error('Nao foi possivel remover esse bloco.')
+      toast.error('Não foi possível remover esse bloco.')
       return
     }
 
@@ -327,8 +327,8 @@ export default function MapaEditorPage() {
     if (val < linhas) {
       const trimmedStudents = countStudentsOutsideBounds(grid, val, colunas)
       const message = trimmedStudents > 0
-        ? `Diminuir para ${val} linhas vai remover ${trimmedStudents} aluno(s) e cortar o mapa fora da nova area. Continuar?`
-        : `Diminuir para ${val} linhas vai cortar o mapa fora da nova area. Continuar?`
+        ? `Diminuir para ${val} linhas vai remover ${trimmedStudents} aluno(s) e cortar o mapa fora da nova área. Continuar?`
+        : `Diminuir para ${val} linhas vai cortar o mapa fora da nova área. Continuar?`
 
       if (!window.confirm(message)) return
     }
@@ -345,8 +345,8 @@ export default function MapaEditorPage() {
     if (val < colunas) {
       const trimmedStudents = countStudentsOutsideBounds(grid, linhas, val)
       const message = trimmedStudents > 0
-        ? `Diminuir para ${val} colunas vai remover ${trimmedStudents} aluno(s) e cortar o mapa fora da nova area. Continuar?`
-        : `Diminuir para ${val} colunas vai cortar o mapa fora da nova area. Continuar?`
+        ? `Diminuir para ${val} colunas vai remover ${trimmedStudents} aluno(s) e cortar o mapa fora da nova área. Continuar?`
+        : `Diminuir para ${val} colunas vai cortar o mapa fora da nova área. Continuar?`
 
       if (!window.confirm(message)) return
     }
@@ -360,7 +360,7 @@ export default function MapaEditorPage() {
   const handleLayoutChange = useCallback((val: string) => {
     if (getPlacedStudentIds(grid).length > 0) {
       const action = val === layoutTipo ? 'resetar' : 'trocar'
-      if (!window.confirm(`Isso vai ${action} o layout e remover as alocacoes atuais dos alunos. Continuar?`)) {
+      if (!window.confirm(`Isso vai ${action} o layout e remover as alocações atuais dos alunos. Continuar?`)) {
         return
       }
     }
@@ -377,8 +377,8 @@ export default function MapaEditorPage() {
     if (mode === 'mobiliar') {
       const placedCount = getPlacedStudentIds(grid).length
       const message = placedCount > 0
-        ? `Isso vai remover TODAS as carteiras e ${placedCount} aluno(s) posicionados. A sala ficara vazia. Continuar?`
-        : 'Isso vai remover todas as carteiras. A sala ficara vazia. Continuar?'
+        ? `Isso vai remover TODAS as carteiras e ${placedCount} aluno(s) posicionados. A sala ficará vazia. Continuar?`
+        : 'Isso vai remover todas as carteiras. A sala ficará vazia. Continuar?'
       if (!window.confirm(message)) return
 
       setGrid(clearAllFurniture(linhas, colunas))
@@ -575,7 +575,7 @@ export default function MapaEditorPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline">{layoutTipo}</Badge>
-                  <Badge variant="outline">{saveStatus === 'saved' ? 'Salvo' : saveStatus === 'saving' ? 'Salvando' : 'Edicao ativa'}</Badge>
+                  <Badge variant="outline">{saveStatus === 'saved' ? 'Salvo' : saveStatus === 'saving' ? 'Salvando' : 'Edição ativa'}</Badge>
                 </div>
               </div>
             </CardHeader>
@@ -654,7 +654,7 @@ export default function MapaEditorPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <History className="size-4 text-muted-foreground" />
-              <CardTitle className="text-sm">Historico de Alteracoes</CardTitle>
+              <CardTitle className="text-sm">Histórico de Alterações</CardTitle>
             </div>
           </CardHeader>
           <CardContent>

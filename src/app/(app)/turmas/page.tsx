@@ -110,7 +110,7 @@ export default function TurmasPage() {
 
   async function handleSave() {
     if (!serie.trim() || !turma.trim()) {
-      toast.error('Serie e turma sao obrigatorios.')
+      toast.error('Série e turma são obrigatórios.')
       return
     }
 
@@ -126,7 +126,7 @@ export default function TurmasPage() {
         toast.success('Turma atualizada com sucesso.')
       } else {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Usuario nao autenticado.')
+        if (!user) throw new Error('Usuário não autenticado.')
 
         const { error } = await supabase
           .from('sala_turmas')
@@ -176,13 +176,13 @@ export default function TurmasPage() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">Turmas</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Minhas Turmas</h1>
             {!loading && (
               <Badge variant="secondary">{turmas.length}</Badge>
             )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Organize suas turmas por serie e turno
+            Organize suas turmas por série e turno
           </p>
         </div>
         <Button onClick={openAddDialog}>
@@ -218,7 +218,7 @@ export default function TurmasPage() {
                 <TableHead>Turno</TableHead>
                 <TableHead>Alunos</TableHead>
                 <TableHead>Mapa</TableHead>
-                <TableHead className="w-[70px]">Acoes</TableHead>
+                <TableHead className="w-[70px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -249,7 +249,7 @@ export default function TurmasPage() {
                         render={<Button variant="ghost" size="icon-sm" />}
                       >
                         <MoreVertical className="size-4" />
-                        <span className="sr-only">Acoes</span>
+                        <span className="sr-only">Ações</span>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem

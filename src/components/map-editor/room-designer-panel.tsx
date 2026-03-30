@@ -248,7 +248,7 @@ export function RoomDesignerPanel({
                 <ToggleGroup
                   value={String(selectedWallElement.size ?? 2) as '1' | '2' | '3'}
                   options={['1', '2', '3']}
-                  labels={{ '1': 'Pequeno', '2': 'Medio', '3': 'Grande' }}
+                  labels={{ '1': 'Pequeno', '2': 'Médio', '3': 'Grande' }}
                   onChange={(size) => handleWallElementChange(selectedWallElement.id, { size: Number(size) as 1 | 2 | 3 })}
                   className="grid-cols-3"
                 />
@@ -256,7 +256,7 @@ export function RoomDesignerPanel({
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="wall-position">Posicao na parede</Label>
+                  <Label htmlFor="wall-position">Posição na parede</Label>
                   <span className="text-xs text-muted-foreground">{selectedWallElement.position}%</span>
                 </div>
                 <input
@@ -333,7 +333,7 @@ export function RoomDesignerPanel({
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Posicao</Label>
+                      <Label>Posição</Label>
                       <ToggleGroup
                         value={roomConfig.boardWall}
                         options={BOARD_WALL_OPTIONS}
@@ -354,7 +354,7 @@ export function RoomDesignerPanel({
                       <CardTitle>Mesa do Professor</CardTitle>
                     </div>
                     <CardDescription>
-                      Escolha a posicao da mesa em relacao ao quadro.
+                      Escolha a posição da mesa em relação ao quadro.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -395,7 +395,7 @@ export function RoomDesignerPanel({
                   <CardHeader>
                     <CardTitle>Elementos da Sala</CardTitle>
                     <CardDescription>
-                      Selecione uma porta ou janela para ajustar parede, tipo e posicao.
+                      Selecione uma porta ou janela para ajustar parede, tipo e posição.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
