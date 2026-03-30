@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import Link from 'next/link'
 import {
   Users, GraduationCap, LayoutGrid, Share2,
-  Plus, ArrowRight, Clock,
+  Plus, ArrowRight, Clock, Eye, Pencil,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,16 +27,28 @@ interface RecentMap {
   turma: { serie: string; turma: string; turno: string }
 }
 
+interface SharedTurma {
+  id: number
+  turma_id: number
+  papel: string
+  turma: { serie: string; turma: string; turno: string }
+  owner: { nome: string }
+}
+
 export default function DashboardPage() {
   const supabase = createClient()
   const [stats, setStats] = useState<Stats>({ turmas: 0, alunos: 0, mapas: 0, compartilhados: 0 })
   const [recentMaps, setRecentMaps] = useState<RecentMap[]>([])
+  const [sharedTurmas, setSharedTurmas] = useState<SharedTurma[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchData = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
+      // Vincular convites pendentes por email
+      await supabase.rpc('vincular_convites_pendentes').catch(() => {})
 
       const [turmasRes, alunosRes, mapasRes, sharesRes] = await Promise.all([
         supabase.from('sala_turmas').select('id', { count: 'exact' }).eq('user_id', user.id).eq('ativo', true),
@@ -64,6 +76,21 @@ export default function DashboardPage() {
           ...m,
           turma: Array.isArray(m.turma) ? m.turma[0] : m.turma,
         })) as RecentMap[])
+      }
+
+      // Buscar turmas compartilhadas comigo
+      const { data: shared } = await supabase
+        .from('turma_compartilhamentos')
+        .select('id, turma_id, papel, turma:sala_turmas(serie, turma, turno), owner:profiles!convidado_por(nome)')
+        .eq('user_id', user.id)
+        .eq('status', 'aceito')
+
+      if (shared) {
+        setSharedTurmas(shared.map((s: Record<string, unknown>) => ({
+          ...s,
+          turma: Array.isArray(s.turma) ? s.turma[0] : s.turma,
+          owner: Array.isArray(s.owner) ? s.owner[0] : s.owner,
+        })) as SharedTurma[])
       }
     } catch {
       toast.error('Erro ao carregar dashboard.')
@@ -125,6 +152,50 @@ export default function DashboardPage() {
           )
         })}
       </div>
+
+      {/* Turmas compartilhadas comigo */}
+      {sharedTurmas.length > 0 && (
+        <Card className="border-amber-200/70">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Share2 className="size-4 text-amber-600" />
+              <CardTitle className="text-lg">Compartilhadas Comigo</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {sharedTurmas.map((s) => (
+                <Link
+                  key={s.id}
+                  href={`/turmas/${s.turma_id}/mapa`}
+                  className="flex items-center justify-between rounded-lg border px-3 py-2.5 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100">
+                      <Share2 className="size-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {s.turma?.serie} {s.turma?.turma}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Por {s.owner?.nome} · {s.turma?.turno}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-[10px]">
+                    {s.papel === 'editor' ? (
+                      <><Pencil className="size-2.5 mr-0.5" /> Editor</>
+                    ) : (
+                      <><Eye className="size-2.5 mr-0.5" /> Visualizador</>
+                    )}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent maps */}
       <Card>

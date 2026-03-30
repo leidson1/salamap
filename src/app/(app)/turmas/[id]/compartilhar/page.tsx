@@ -5,12 +5,13 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { ArrowLeft, Copy, Download, Printer, Link2, QrCode } from 'lucide-react'
+import { ArrowLeft, Copy, Download, Printer, Link2, QrCode, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import Link from 'next/link'
 import { QrCodeCard, generateQrDataUrl } from '@/components/qr-code-card'
 import { generateShareCode } from '@/lib/map/utils'
 import type { Turma, Mapa, MapaCompartilhamento } from '@/types/database'
@@ -294,6 +295,24 @@ export default function CompartilharPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Compartilhar com professores */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Compartilhar com Professores</CardTitle>
+                <CardDescription>
+                  Convide outros professores para ver ou editar o mapa desta turma
+                </CardDescription>
+              </div>
+              <Button variant="outline" render={<Link href={`/turmas/${turmaId}/compartilhar/membros`} />}>
+                <Users className="size-4 mr-1" />
+                Gerenciar Membros
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
       )}
     </div>
   )

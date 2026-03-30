@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { ArrowLeft, DoorOpen, Share2, Sparkles, Users, Armchair } from 'lucide-react'
+import { ArrowLeft, DoorOpen, Share2, Sparkles, Users, Armchair, History } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,6 +14,7 @@ import { FurnitureStudioPanel } from '@/components/map-editor/furniture-studio-p
 import { RoomDesignerPanel } from '@/components/map-editor/room-designer-panel'
 import { StudentSidebar } from '@/components/map-editor/student-sidebar'
 import { Toolbar } from '@/components/map-editor/toolbar'
+import { HistoryTimeline } from '@/components/map-editor/history-timeline'
 import { useAutoSave } from '@/hooks/use-auto-save'
 import {
   applyFurnitureTool,
@@ -596,6 +597,21 @@ export default function MapaEditorPage() {
           />
         )}
       </div>
+
+      {/* Historico de alteracoes */}
+      {mapa && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <History className="size-4 text-muted-foreground" />
+              <CardTitle className="text-sm">Historico de Alteracoes</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <HistoryTimeline mapaId={mapa.id} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

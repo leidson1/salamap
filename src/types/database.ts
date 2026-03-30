@@ -101,6 +101,36 @@ export interface MapaHistorico {
   created_at: string
 }
 
+// Compartilhamento de turma
+export interface TurmaCompartilhamento {
+  id: number
+  turma_id: number
+  user_id: string | null
+  email: string
+  papel: 'editor' | 'visualizador'
+  status: 'pendente' | 'aceito'
+  convite_token: string
+  convidado_por: string
+  created_at: string
+}
+
+// Escola / Workspace
+export interface Escola {
+  id: number
+  nome: string
+  codigo_convite: string
+  criado_por: string
+  created_at: string
+}
+
+export interface EscolaMembro {
+  id: number
+  escola_id: number
+  user_id: string
+  papel: 'coordenador' | 'professor'
+  created_at: string
+}
+
 export interface PublicMapData {
   mapa: {
     id: number

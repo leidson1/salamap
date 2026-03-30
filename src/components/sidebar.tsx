@@ -7,6 +7,7 @@ import {
   Users,
   LogOut,
   LayoutGrid,
+  Building2,
 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/client'
@@ -36,6 +37,7 @@ export function SidebarContent({ user, currentPath }: SidebarProps) {
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/turmas', label: 'Turmas', icon: Users },
+    { href: '/escola', label: 'Escola', icon: Building2 },
   ]
 
   return (
