@@ -96,9 +96,10 @@ export function generateU(linhas: number, colunas: number): Grid {
         row.push(cell('vazio'))
       } else {
         // Cadeiras apontam pro centro do U
-        const rot: 0 | 90 | 180 | 270 = isTop ? 180
-          : isLeft ? 270
-          : isRight ? 90
+        // rotacao 0=cadeira embaixo, 90=cadeira direita, 180=cadeira cima, 270=cadeira esquerda
+        const rot: 0 | 90 | 180 | 270 = isTop ? 0    // topo: cadeira pra baixo (centro)
+          : isLeft ? 90                                 // esquerda: cadeira pra direita (centro)
+          : isRight ? 270                               // direita: cadeira pra esquerda (centro)
           : 0
         row.push(cell('carteira', soloId(r, c), rot))
       }
