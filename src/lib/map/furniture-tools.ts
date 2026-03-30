@@ -16,6 +16,13 @@ export type FurnitureTool = typeof FURNITURE_TOOLS[number]['value'] | typeof LEG
 
 export const FURNITURE_COMPOSER_PRESETS = [
   {
+    value: 'individual',
+    label: 'Individual',
+    description: 'Uma carteira avulsa.',
+    defaultWidth: 1,
+    defaultHeight: 1,
+  },
+  {
     value: 'fileira',
     label: 'Fileira',
     description: 'Linha unica de carteiras com tamanho variavel.',
@@ -102,6 +109,8 @@ export function normalizeFurnitureComposerConfig(
   const height = typeof config?.height === 'number' ? Math.round(config.height) : DEFAULT_FURNITURE_COMPOSER_CONFIG.height
 
   switch (kind) {
+    case 'individual':
+      return { kind, width: 1, height: 1 }
     case 'grupo':
       return {
         kind,

@@ -75,6 +75,7 @@ export function FurnitureStudioPanel({
   const canShrinkWidth = !!selectedBlock && selectedBlock.width > 1
   const canShrinkDepth = !!selectedBlock && selectedBlock.height > 1
   const normalizedComposer = normalizeFurnitureComposerConfig(composerConfig)
+  const isIndividual = normalizedComposer.kind === 'individual'
   const depthLocked = normalizedComposer.kind !== 'grupo'
 
   return (
@@ -179,6 +180,7 @@ export function FurnitureStudioPanel({
                   type="number"
                   min={1}
                   max={8}
+                  disabled={isIndividual}
                   value={normalizedComposer.width}
                   onChange={(event) => onComposerConfigChange(normalizeFurnitureComposerConfig({
                     ...normalizedComposer,
