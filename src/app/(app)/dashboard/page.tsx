@@ -63,10 +63,10 @@ export default function DashboardPage() {
       // Vincular convites pendentes
       await supabase.rpc('vincular_convites_pendentes').catch(() => {})
 
-      // Buscar turmas com alunos, mapas e compartilhamentos
+      // Buscar turmas com alunos e mapas (com compartilhamentos)
       const { data: turmasData } = await supabase
         .from('sala_turmas')
-        .select('id, serie, turma, turno, sala_alunos(count), mapas(id, updated_at), mapa_compartilhamentos(id, ativo)')
+        .select('id, serie, turma, turno, sala_alunos(count), mapas(id, updated_at, mapa_compartilhamentos(id, ativo))')
         .eq('user_id', user.id)
         .eq('ativo', true)
         .order('serie')
@@ -75,8 +75,9 @@ export default function DashboardPage() {
       if (turmasData) {
         setTurmas(turmasData.map((t: Record<string, unknown>) => {
           const alunos = t.sala_alunos as Array<{ count: number }> | undefined
-          const mapas = t.mapas as Array<{ id: number; updated_at: string }> | undefined
-          const shares = t.mapa_compartilhamentos as Array<{ id: number; ativo: boolean }> | undefined
+          const mapas = t.mapas as Array<{ id: number; updated_at: string; mapa_compartilhamentos: Array<{ id: number; ativo: boolean }> }> | undefined
+          const mapa = mapas?.[0] ?? null
+          const shares = mapa?.mapa_compartilhamentos ?? []
 
           return {
             id: t.id as number,
@@ -84,9 +85,9 @@ export default function DashboardPage() {
             turma: t.turma as string,
             turno: t.turno as string,
             alunoCount: alunos?.[0]?.count ?? 0,
-            mapa: mapas?.[0] ?? null,
-            shared: (shares?.length ?? 0) > 0,
-            shareActive: shares?.some(s => s.ativo) ?? false,
+            mapa: mapa ? { id: mapa.id, updated_at: mapa.updated_at } : null,
+            shared: shares.length > 0,
+            shareActive: shares.some(s => s.ativo),
           }
         }))
       }
