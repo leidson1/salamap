@@ -38,7 +38,7 @@ interface TurmaRow {
   mapas: { id: number }[]
 }
 
-const TURNOS = ['Manha', 'Tarde', 'Integral', 'Noite'] as const
+const TURNOS = ['Manhã', 'Tarde', 'Integral', 'Noite'] as const
 
 export default function TurmasPage() {
   const supabase = createClient()
@@ -50,7 +50,7 @@ export default function TurmasPage() {
   const [deletingTurma, setDeletingTurma] = useState<TurmaRow | null>(null)
   const [serie, setSerie] = useState('')
   const [turma, setTurma] = useState('')
-  const [turno, setTurno] = useState<string>('Manha')
+  const [turno, setTurno] = useState<string>('Manhã')
   const [saving, setSaving] = useState(false)
 
   const fetchTurmas = useCallback(async () => {
@@ -91,7 +91,7 @@ export default function TurmasPage() {
     setEditingTurma(null)
     setSerie('')
     setTurma('')
-    setTurno('Manha')
+    setTurno('Manhã')
     setDialogOpen(true)
   }
 
@@ -139,7 +139,7 @@ export default function TurmasPage() {
       setDialogOpen(false)
       setSerie('')
       setTurma('')
-      setTurno('Manha')
+      setTurno('Manhã')
       setEditingTurma(null)
       fetchTurmas()
     } catch {

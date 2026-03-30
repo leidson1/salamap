@@ -17,9 +17,9 @@ function timeAgo(dateStr: string) {
   const diffD = Math.floor(diffH / 24)
 
   if (diffMin < 1) return 'agora mesmo'
-  if (diffMin < 60) return `há${diffMin}min`
-  if (diffH < 24) return `há${diffH}h`
-  if (diffD < 7) return `há${diffD} dia${diffD > 1 ? 's' : ''}`
+  if (diffMin < 60) return `há ${diffMin}min`
+  if (diffH < 24) return `há ${diffH}h`
+  if (diffD < 7) return `há ${diffD} dia${diffD > 1 ? 's' : ''}`
   return date.toLocaleDateString('pt-BR')
 }
 

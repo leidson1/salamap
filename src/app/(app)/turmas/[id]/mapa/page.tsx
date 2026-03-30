@@ -648,7 +648,7 @@ export default function MapaEditorPage() {
         )}
       </div>
 
-      {/* Historico de alteracoes */}
+      {/* Histórico de alterações */}
       {mapa && (
         <Card>
           <CardHeader className="pb-2">
