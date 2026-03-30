@@ -139,11 +139,18 @@ function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, 
   connections: DeskConnections
   rotacao?: 0 | 90 | 180 | 270
 }) {
-  const deskH = h * 0.72
   const chairW = 18
   const chairH = 7
+  const chairGap = 2
   const connectorInsetX = 10
   const connectorInsetY = 8
+
+  // Mesa quadrada que cabe na celula mesmo girada
+  // Lado = menor dimensao - espaco da cadeira
+  const deskSide = Math.min(w, h) - chairH - chairGap - 4
+  // Offsets para centralizar a mesa+cadeira na celula
+  const offsetX = (w - deskSide) / 2
+  const offsetY = (h - deskSide - chairH - chairGap) / 2
 
   const bgColor = isDragOver ? COLORS.deskHighlight
     : selected ? '#fef3c7'
@@ -152,144 +159,113 @@ function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, 
     : selected ? '#f59e0b'
     : occupied ? COLORS.deskOccupiedBorder : COLORS.deskEmptyBorder
 
+  // Centro da celula para rotacao
+  const cx = w / 2
+  const cy = h / 2
+
   return (
     <Group x={x} y={y}>
-      {connections.left && (
-        <Rect
-          x={-BLOCK_CONNECTOR}
-          y={connectorInsetY}
-          width={BLOCK_CONNECTOR + 2}
-          height={deskH - connectorInsetY * 2}
-          cornerRadius={4}
-          fill={bgColor}
-        />
-      )}
-      {connections.right && (
-        <Rect
-          x={w - 2}
-          y={connectorInsetY}
-          width={BLOCK_CONNECTOR + 2}
-          height={deskH - connectorInsetY * 2}
-          cornerRadius={4}
-          fill={bgColor}
-        />
-      )}
-      {connections.top && (
-        <Rect
-          x={connectorInsetX}
-          y={-BLOCK_CONNECTOR}
-          width={w - connectorInsetX * 2}
-          height={BLOCK_CONNECTOR + 2}
-          cornerRadius={4}
-          fill={bgColor}
-        />
-      )}
-      {connections.bottom && (
-        <Rect
-          x={connectorInsetX}
-          y={deskH - 2}
-          width={w - connectorInsetX * 2}
-          height={BLOCK_CONNECTOR + 2}
-          cornerRadius={4}
-          fill={bgColor}
-        />
-      )}
-      {/* Shadow */}
-      <Rect
-        x={2} y={3} width={w} height={deskH}
-        cornerRadius={6}
-        fill="rgba(0,0,0,0.05)"
-      />
-      {/* Desk surface */}
-      <Rect
-        width={w} height={deskH}
-        cornerRadius={6}
-        fill={bgColor}
-        stroke={borderColor}
-        strokeWidth={selected || occupied ? 2 : 1}
-      />
-      {/* "Front" edge indicator — a subtle line on the side facing the student */}
-      {rotacao === 0 && (
-        <Line points={[6, deskH, w - 6, deskH]} stroke={borderColor} strokeWidth={2} opacity={0.5} />
-      )}
-      {rotacao === 180 && (
-        <Line points={[6, 0, w - 6, 0]} stroke={borderColor} strokeWidth={2} opacity={0.5} />
-      )}
-      {rotacao === 90 && (
-        <Line points={[w, 4, w, deskH - 4]} stroke={borderColor} strokeWidth={2} opacity={0.5} />
-      )}
-      {rotacao === 270 && (
-        <Line points={[0, 4, 0, deskH - 4]} stroke={borderColor} strokeWidth={2} opacity={0.5} />
-      )}
-      {/* Student info */}
-      {occupied && studentNum !== undefined && (
-        <>
-          <Circle
-            x={w / 2} y={deskH * 0.32}
-            radius={11}
-            fill={COLORS.studentNum} opacity={0.1}
+      <Group
+        offsetX={cx}
+        offsetY={cy}
+        x={cx}
+        y={cy}
+        rotation={rotacao}
+      >
+        {/* Posicionar mesa+cadeira a partir do offset */}
+        <Group x={offsetX} y={offsetY}>
+          {connections.left && (
+            <Rect
+              x={-BLOCK_CONNECTOR - offsetX}
+              y={connectorInsetY}
+              width={BLOCK_CONNECTOR + offsetX + 2}
+              height={deskSide - connectorInsetY * 2}
+              cornerRadius={4}
+              fill={bgColor}
+            />
+          )}
+          {connections.right && (
+            <Rect
+              x={deskSide - 2}
+              y={connectorInsetY}
+              width={BLOCK_CONNECTOR + offsetX + 2}
+              height={deskSide - connectorInsetY * 2}
+              cornerRadius={4}
+              fill={bgColor}
+            />
+          )}
+          {connections.top && (
+            <Rect
+              x={connectorInsetX}
+              y={-BLOCK_CONNECTOR - offsetY}
+              width={deskSide - connectorInsetX * 2}
+              height={BLOCK_CONNECTOR + offsetY + 2}
+              cornerRadius={4}
+              fill={bgColor}
+            />
+          )}
+          {connections.bottom && (
+            <Rect
+              x={connectorInsetX}
+              y={deskSide - 2}
+              width={deskSide - connectorInsetX * 2}
+              height={BLOCK_CONNECTOR + offsetY + 2}
+              cornerRadius={4}
+              fill={bgColor}
+            />
+          )}
+          {/* Shadow */}
+          <Rect
+            x={2} y={2} width={deskSide} height={deskSide}
+            cornerRadius={6}
+            fill="rgba(0,0,0,0.05)"
           />
-          <Text
-            x={0} y={deskH * 0.18} width={w}
-            text={String(studentNum ?? '?')}
-            fontSize={12} fontStyle="bold" fill={COLORS.studentNum}
-            align="center"
+          {/* Desk surface */}
+          <Rect
+            width={deskSide} height={deskSide}
+            cornerRadius={6}
+            fill={bgColor}
+            stroke={borderColor}
+            strokeWidth={selected || occupied ? 2 : 1}
           />
-          <Text
-            x={4} y={deskH * 0.52} width={w - 8}
-            text={studentName?.split(' ')[0] ?? ''}
-            fontSize={10} fill={COLORS.studentName}
-            align="center" ellipsis wrap="none"
+          {/* Student info */}
+          {occupied && studentNum !== undefined && (
+            <>
+              <Circle
+                x={deskSide / 2} y={deskSide * 0.3}
+                radius={11}
+                fill={COLORS.studentNum} opacity={0.1}
+              />
+              <Text
+                x={0} y={deskSide * 0.16} width={deskSide}
+                text={String(studentNum ?? '?')}
+                fontSize={12} fontStyle="bold" fill={COLORS.studentNum}
+                align="center"
+              />
+              <Text
+                x={4} y={deskSide * 0.5} width={deskSide - 8}
+                text={studentName?.split(' ')[0] ?? ''}
+                fontSize={10} fill={COLORS.studentName}
+                align="center" ellipsis wrap="none"
+              />
+            </>
+          )}
+          {isDragOver && (
+            <Text
+              x={0} y={deskSide * 0.35} width={deskSide}
+              text="Soltar aqui" fontSize={9} fill={COLORS.studentNum}
+              align="center"
+            />
+          )}
+          {/* Chair — always at bottom, Group rotation handles direction */}
+          <Rect
+            x={deskSide / 2 - chairW / 2} y={deskSide + chairGap}
+            width={chairW} height={chairH}
+            cornerRadius={[0, 0, 9, 9]}
+            fill={occupied ? COLORS.chair : COLORS.chairEmpty}
           />
-        </>
-      )}
-      {!occupied && !isDragOver && (
-        <Text
-          x={0} y={deskH * 0.38} width={w}
-          text="" fontSize={9} fill="#d1d5db"
-          align="center"
-        />
-      )}
-      {isDragOver && (
-        <Text
-          x={0} y={deskH * 0.32} width={w}
-          text="Soltar aqui" fontSize={9} fill={COLORS.studentNum}
-          align="center"
-        />
-      )}
-      {/* Chair — positioned on the side the student sits */}
-      {rotacao === 0 && (
-        <Rect
-          x={w / 2 - chairW / 2} y={deskH + 2}
-          width={chairW} height={chairH}
-          cornerRadius={[0, 0, 9, 9]}
-          fill={occupied ? COLORS.chair : COLORS.chairEmpty}
-        />
-      )}
-      {rotacao === 180 && (
-        <Rect
-          x={w / 2 - chairW / 2} y={-chairH - 2}
-          width={chairW} height={chairH}
-          cornerRadius={[9, 9, 0, 0]}
-          fill={occupied ? COLORS.chair : COLORS.chairEmpty}
-        />
-      )}
-      {rotacao === 90 && (
-        <Rect
-          x={w + 2} y={deskH / 2 - chairW / 2}
-          width={chairH} height={chairW}
-          cornerRadius={[0, 9, 9, 0]}
-          fill={occupied ? COLORS.chair : COLORS.chairEmpty}
-        />
-      )}
-      {rotacao === 270 && (
-        <Rect
-          x={-chairH - 2} y={deskH / 2 - chairW / 2}
-          width={chairH} height={chairW}
-          cornerRadius={[9, 0, 0, 9]}
-          fill={occupied ? COLORS.chair : COLORS.chairEmpty}
-        />
-      )}
+        </Group>
+      </Group>
     </Group>
   )
 }
