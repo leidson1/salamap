@@ -32,6 +32,7 @@ export interface GridCell {
   tipo: CellType
   alunoId: number | null
   blocoId?: string | null
+  rotacao?: 0 | 90 | 180 | 270 // direcao da cadeira: 0=baixo, 90=esquerda, 180=cima, 270=direita
 }
 
 export type Grid = GridCell[][]

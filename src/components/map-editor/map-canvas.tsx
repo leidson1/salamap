@@ -131,12 +131,13 @@ const COLORS = {
   windowBorder: '#7dd3fc',
 }
 
-function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, selected, connections }: {
+function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, selected, connections, rotacao = 0 }: {
   x: number; y: number; w: number; h: number
   occupied: boolean; studentName?: string; studentNum?: number | null
   isDragOver?: boolean
   selected?: boolean
   connections: DeskConnections
+  rotacao?: 0 | 90 | 180 | 270
 }) {
   const deskH = h * 0.72
   const chairW = 18
@@ -243,13 +244,39 @@ function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, 
           align="center"
         />
       )}
-      {/* Chair */}
-      <Rect
-        x={w / 2 - chairW / 2} y={deskH + 2}
-        width={chairW} height={chairH}
-        cornerRadius={[0, 0, 9, 9]}
-        fill={occupied ? COLORS.chair : COLORS.chairEmpty}
-      />
+      {/* Chair — positioned based on rotation */}
+      {rotacao === 0 && (
+        <Rect
+          x={w / 2 - chairW / 2} y={deskH + 2}
+          width={chairW} height={chairH}
+          cornerRadius={[0, 0, 9, 9]}
+          fill={occupied ? COLORS.chair : COLORS.chairEmpty}
+        />
+      )}
+      {rotacao === 180 && (
+        <Rect
+          x={w / 2 - chairW / 2} y={-chairH - 2}
+          width={chairW} height={chairH}
+          cornerRadius={[9, 9, 0, 0]}
+          fill={occupied ? COLORS.chair : COLORS.chairEmpty}
+        />
+      )}
+      {rotacao === 90 && (
+        <Rect
+          x={-chairH - 2} y={deskH / 2 - chairW / 2}
+          width={chairH} height={chairW}
+          cornerRadius={[9, 0, 0, 9]}
+          fill={occupied ? COLORS.chair : COLORS.chairEmpty}
+        />
+      )}
+      {rotacao === 270 && (
+        <Rect
+          x={w + 2} y={deskH / 2 - chairW / 2}
+          width={chairH} height={chairW}
+          cornerRadius={[0, 9, 9, 0]}
+          fill={occupied ? COLORS.chair : COLORS.chairEmpty}
+        />
+      )}
     </Group>
   )
 }
@@ -770,6 +797,7 @@ export function MapCanvas({
                     isDragOver={isOver}
                     selected={selected}
                     connections={connections}
+                    rotacao={(cell.rotacao as 0 | 90 | 180 | 270) || 0}
                   />
                 </Group>
               )

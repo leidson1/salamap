@@ -13,13 +13,20 @@ interface PublicGridProps {
   roomConfig?: RoomConfig | null
 }
 
-function MiniChair({ muted = false }: { muted?: boolean }) {
-  return (
-    <div className={cn(
-      'w-4 h-1.5 rounded-b-full mx-auto -mt-px',
-      muted ? 'bg-stone-300/40' : 'bg-stone-400/80'
-    )} />
-  )
+function MiniChair({ muted = false, rotacao = 0 }: { muted?: boolean; rotacao?: number }) {
+  const color = muted ? 'bg-stone-300/40' : 'bg-stone-400/80'
+
+  if (rotacao === 180) {
+    return <div className={cn('w-4 h-1.5 rounded-t-full mx-auto -mb-px', color)} />
+  }
+  if (rotacao === 90) {
+    return <div className={cn('w-1.5 h-4 rounded-l-full absolute -left-1 top-1/2 -translate-y-1/2', color)} />
+  }
+  if (rotacao === 270) {
+    return <div className={cn('w-1.5 h-4 rounded-r-full absolute -right-1 top-1/2 -translate-y-1/2', color)} />
+  }
+  // default: 0 (baixo)
+  return <div className={cn('w-4 h-1.5 rounded-b-full mx-auto -mt-px', color)} />
 }
 
 function getDeskConnections(grid: Grid, row: number, col: number) {
@@ -63,6 +70,7 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
             // carteira
             const aluno = cell.alunoId ? alunoMap.get(cell.alunoId) : null
             const connections = getDeskConnections(grid, rIdx, cIdx)
+            const rot = (cell.rotacao as number) || 0
             return (
               <div key={`${rIdx}-${cIdx}`} className="relative h-14 overflow-visible sm:h-16">
                 {connections.left && (
@@ -89,6 +97,7 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
                     !aluno && 'bg-amber-50/70'
                   )} />
                 )}
+                {rot === 180 && <MiniChair muted={!aluno} rotacao={rot} />}
                 <div className={cn(
                   'relative flex items-center justify-center rounded-t-md rounded-b-sm px-1 text-center',
                   'h-[42px] sm:h-[50px]',
@@ -109,7 +118,7 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
                     <span className="text-[8px] text-amber-300/60">-</span>
                   )}
                 </div>
-                <MiniChair muted={!aluno} />
+                {rot !== 180 && <MiniChair muted={!aluno} rotacao={rot} />}
               </div>
             )
           })
