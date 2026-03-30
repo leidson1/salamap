@@ -79,32 +79,54 @@ export default function MapaEditorPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       console.error('[SalaMap] Save failed: user not authenticated')
-      return
+      throw new Error('Nao autenticado')
     }
+    const payload = {
+      grid: JSON.parse(JSON.stringify(grid)),
+      linhas,
+      colunas,
+      layout_tipo: layoutTipo,
+      room_config: JSON.parse(JSON.stringify(roomConfig)),
+    }
+
     if (mapa) {
-      const { error } = await supabase.from('mapas').update({
-        grid: JSON.parse(JSON.stringify(grid)),
-        linhas, colunas, layout_tipo: layoutTipo, room_config: roomConfig,
-      }).eq('id', mapa.id)
+      // Usar .select() pra verificar se realmente salvou
+      const { data: updated, error } = await supabase
+        .from('mapas')
+        .update(payload)
+        .eq('id', mapa.id)
+        .eq('user_id', user.id)
+        .select('id')
+        .single()
+
       if (error) {
-        console.error('[SalaMap] Save update error:', error.message, error.details)
+        console.error('[SalaMap] Save update error:', error.message, error.details, error.hint)
         throw error
       }
+      if (!updated) {
+        console.error('[SalaMap] Save update: 0 rows affected. mapa.id=', mapa.id, 'user.id=', user.id)
+        throw new Error('Nenhuma linha atualizada — verifique permissoes do banco.')
+      }
     } else {
-      const { data, error } = await supabase.from('mapas').insert({
-        user_id: user.id, turma_id: turmaId,
-        grid: JSON.parse(JSON.stringify(grid)),
-        linhas, colunas, layout_tipo: layoutTipo, room_config: roomConfig,
-      }).select().single()
+      const { data, error } = await supabase
+        .from('mapas')
+        .insert({ ...payload, user_id: user.id, turma_id: turmaId })
+        .select()
+        .single()
+
       if (error) {
-        console.error('[SalaMap] Save insert error:', error.message, error.details)
+        console.error('[SalaMap] Save insert error:', error.message, error.details, error.hint)
         throw error
       }
       if (data) setMapa(data as Mapa)
     }
   }, [grid, linhas, colunas, layoutTipo, roomConfig, mapa, turmaId, supabase])
 
-  const { trigger: triggerSave, flush: flushSave, saveStatus } = useAutoSave(saveFn)
+  const { trigger: triggerSave, flush: flushSave, saveStatus } = useAutoSave(
+    saveFn,
+    1500,
+    (msg) => toast.error(`Erro ao salvar: ${msg}`)
+  )
 
   useEffect(() => {
     async function loadData() {

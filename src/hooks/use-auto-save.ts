@@ -4,16 +4,22 @@ import { useRef, useCallback, useEffect, useState } from 'react'
 
 export function useAutoSave(
   saveFn: () => Promise<void>,
-  delay: number = 1500
+  delay: number = 1500,
+  onError?: (msg: string) => void
 ) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resetStatusRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveFnRef = useRef(saveFn)
+  const onErrorRef = useRef(onError)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   useEffect(() => {
     saveFnRef.current = saveFn
   }, [saveFn])
+
+  useEffect(() => {
+    onErrorRef.current = onError
+  }, [onError])
 
   const clearTimers = useCallback(() => {
     if (timeoutRef.current) {
@@ -36,9 +42,10 @@ export function useAutoSave(
       setSaveStatus('saved')
       resetStatusRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
     } catch (err) {
-      console.error('[SalaMap] Auto-save failed:', err)
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+      console.error('[SalaMap] Auto-save failed:', msg, err)
       setSaveStatus('error')
-      // Manter status error por 5s antes de voltar pra idle
+      onErrorRef.current?.(msg)
       resetStatusRef.current = setTimeout(() => setSaveStatus('idle'), 5000)
     }
   }, [clearTimers])
