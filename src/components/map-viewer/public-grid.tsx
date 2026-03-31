@@ -11,6 +11,9 @@ interface PublicGridProps {
   colunas: number
   alunoMap: Map<number, { nome: string; numero: number | null; apelido?: string | null }>
   roomConfig?: RoomConfig | null
+  editable?: boolean
+  selectedAlunoId?: number | null
+  onCellClick?: (row: number, col: number) => void
 }
 
 function getDeskConnections(grid: Grid, row: number, col: number) {
@@ -28,7 +31,7 @@ function getDeskConnections(grid: Grid, row: number, col: number) {
   }
 }
 
-export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridProps) {
+export function PublicGrid({ grid, colunas, alunoMap, roomConfig, editable, selectedAlunoId, onCellClick }: PublicGridProps) {
   const allAlunos = Array.from(alunoMap.values())
   return (
     <ClassroomFrame roomConfig={roomConfig} compact>
@@ -56,9 +59,20 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
             const aluno = cell.alunoId ? alunoMap.get(Number(cell.alunoId)) : null
             const connections = getDeskConnections(grid, rIdx, cIdx)
             const occupied = !!aluno
+            const isSelected = editable && occupied && selectedAlunoId === Number(cell.alunoId)
+            const isTarget = editable && selectedAlunoId && !occupied
 
             return (
-              <div key={`${rIdx}-${cIdx}`} className="relative overflow-visible">
+              <div
+                key={`${rIdx}-${cIdx}`}
+                className={cn(
+                  'relative overflow-visible',
+                  editable && 'cursor-pointer',
+                  isSelected && 'ring-2 ring-emerald-500 rounded-lg',
+                  isTarget && 'ring-2 ring-dashed ring-emerald-300 rounded-lg',
+                )}
+                onClick={() => onCellClick?.(rIdx, cIdx)}
+              >
                 {/* Block connectors */}
                 {connections.left && (
                   <div className={cn(

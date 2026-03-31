@@ -26,6 +26,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  // Redirect após login (vem do link compartilhado)
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const redirectTo = searchParams?.get('redirect') || '/dashboard';
+
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim()) { toast.error("Digite seu email."); return; }
@@ -48,7 +52,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push(redirectTo);
     } catch {
       toast.error("Erro ao conectar. Tente novamente.");
     } finally {

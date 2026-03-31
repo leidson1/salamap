@@ -1,12 +1,19 @@
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
+import Link from 'next/link'
 import { PublicGrid } from '@/components/map-viewer/public-grid'
 import { StudentList } from '@/components/map-viewer/student-list'
-import { LayoutGrid, Clock, Users, AlertCircle, RefreshCw } from 'lucide-react'
-import type { PublicMapData } from '@/types/database'
-
-interface PageProps {
-  params: Promise<{ shareCode: string }>
-}
+import {
+  LayoutGrid, Clock, Users, AlertCircle, RefreshCw,
+  LogIn, Pencil, Eye, Lock, UserPlus,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import type { PublicMapData, Grid } from '@/types/database'
 
 function timeAgo(dateStr: string) {
   const now = new Date()
@@ -15,7 +22,6 @@ function timeAgo(dateStr: string) {
   const diffMin = Math.floor(diffMs / 60000)
   const diffH = Math.floor(diffMin / 60)
   const diffD = Math.floor(diffH / 24)
-
   if (diffMin < 1) return 'agora mesmo'
   if (diffMin < 60) return `há ${diffMin}min`
   if (diffH < 24) return `há ${diffH}h`
@@ -23,40 +29,303 @@ function timeAgo(dateStr: string) {
   return date.toLocaleDateString('pt-BR')
 }
 
-export default async function PublicMapPage({ params }: PageProps) {
-  const { shareCode } = await params
-  const supabase = await createClient()
+type AccessLevel = 'none' | 'viewer' | 'editor'
 
-  const { data, error } = await supabase.rpc('get_mapa_publico', {
-    p_share_code: shareCode,
-  })
+export default function SharedMapPage() {
+  const params = useParams()
+  const router = useRouter()
+  const shareCode = params.shareCode as string
+  const supabase = createClient()
 
-  if (error || !data) {
+  const [mapData, setMapData] = useState<PublicMapData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userName, setUserName] = useState('')
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>('none')
+  const [editMode, setEditMode] = useState(false)
+  const [selectedAlunoId, setSelectedAlunoId] = useState<number | null>(null)
+  const [mapaId, setMapaId] = useState<number | null>(null)
+  const [lastEditor, setLastEditor] = useState<string | null>(null)
+
+  const fetchData = useCallback(async () => {
+    try {
+      // Carregar mapa público
+      const { data, error: rpcError } = await supabase.rpc('get_mapa_publico', {
+        p_share_code: shareCode,
+      })
+
+      if (rpcError || !data) {
+        setError(true)
+        setLoading(false)
+        return
+      }
+
+      setMapData(data as PublicMapData)
+      setMapaId((data as PublicMapData).mapa.id)
+
+      // Verificar se está logado
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        setIsLoggedIn(false)
+        setAccessLevel('none')
+        setLoading(false)
+        return
+      }
+
+      setIsLoggedIn(true)
+
+      // Buscar nome do usuário
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('nome')
+        .eq('id', user.id)
+        .single()
+
+      if (profile) setUserName(profile.nome)
+
+      // Verificar permissão
+      const md = data as PublicMapData
+      const turmaId = md.mapa.id // precisamos do turma_id real
+
+      // Verificar se é dono da turma
+      const { data: turmaCheck } = await supabase
+        .from('mapas')
+        .select('turma_id, user_id, turma:sala_turmas(user_id)')
+        .eq('id', md.mapa.id)
+        .single()
+
+      if (turmaCheck) {
+        const turmaOwner = Array.isArray(turmaCheck.turma) ? turmaCheck.turma[0] : turmaCheck.turma
+        if (turmaCheck.user_id === user.id || (turmaOwner as { user_id: string })?.user_id === user.id) {
+          setAccessLevel('editor')
+          setLoading(false)
+          return
+        }
+
+        // Verificar se é membro da mesma escola
+        const realTurmaId = turmaCheck.turma_id
+
+        // Verificar compartilhamento direto
+        const { data: shareCheck } = await supabase
+          .from('turma_compartilhamentos')
+          .select('papel')
+          .eq('turma_id', realTurmaId)
+          .eq('user_id', user.id)
+          .eq('status', 'aceito')
+          .single()
+
+        if (shareCheck) {
+          setAccessLevel(shareCheck.papel === 'editor' ? 'editor' : 'viewer')
+          setLoading(false)
+          return
+        }
+
+        // Verificar se é da mesma escola (coordenador = editor, professor = viewer)
+        const ownerUserId = (turmaOwner as { user_id: string })?.user_id
+        if (ownerUserId) {
+          const { data: ownerEscola } = await supabase
+            .from('escolas')
+            .select('id')
+            .eq('criado_por', ownerUserId)
+            .single()
+
+          if (ownerEscola) {
+            const { data: myMembership } = await supabase
+              .from('escola_membros')
+              .select('papel')
+              .eq('escola_id', ownerEscola.id)
+              .eq('user_id', user.id)
+              .single()
+
+            if (myMembership) {
+              setAccessLevel(myMembership.papel === 'coordenador' ? 'editor' : 'viewer')
+              setLoading(false)
+              return
+            }
+          }
+
+          // Verificar também escola do membro (não só criador)
+          const { data: myEscolas } = await supabase
+            .from('escola_membros')
+            .select('escola_id')
+            .eq('user_id', user.id)
+
+          if (myEscolas) {
+            for (const me of myEscolas) {
+              const { data: ownerInSameEscola } = await supabase
+                .from('escola_membros')
+                .select('user_id')
+                .eq('escola_id', me.escola_id)
+                .eq('user_id', ownerUserId)
+                .single()
+
+              if (ownerInSameEscola) {
+                setAccessLevel('viewer')
+                setLoading(false)
+                return
+              }
+            }
+          }
+        }
+      }
+
+      // Logado mas sem permissão
+      setAccessLevel('none')
+    } catch (err) {
+      console.error('[SalaMap] Shared map error:', err)
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [supabase, shareCode])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  // Edição: trocar aluno de mesa
+  const handleCellClick = useCallback(async (rIdx: number, cIdx: number) => {
+    if (!editMode || !mapData || !mapaId) return
+
+    const cell = mapData.mapa.grid[rIdx]?.[cIdx]
+    if (!cell || cell.tipo !== 'carteira') return
+
+    const cellAlunoId = cell.alunoId ? Number(cell.alunoId) : null
+
+    if (selectedAlunoId) {
+      // Colocar aluno selecionado nessa mesa
+      const newGrid: Grid = mapData.mapa.grid.map(r => r.map(c => ({ ...c })))
+      // Remover da posição antiga
+      for (const r of newGrid) for (const c of r) if (c.alunoId && Number(c.alunoId) === selectedAlunoId) c.alunoId = null
+      // Colocar na nova posição
+      newGrid[rIdx][cIdx].alunoId = selectedAlunoId
+
+      // Salvar no banco
+      const { error } = await supabase
+        .from('mapas')
+        .update({ grid: JSON.parse(JSON.stringify(newGrid)) })
+        .eq('id', mapaId)
+
+      if (error) {
+        toast.error('Erro ao salvar alteração.')
+        console.error('[SalaMap] Edit error:', error.message)
+        return
+      }
+
+      setMapData({
+        ...mapData,
+        mapa: { ...mapData.mapa, grid: newGrid, updated_at: new Date().toISOString() }
+      })
+      setSelectedAlunoId(null)
+      toast.success('Aluno movido!')
+    } else if (cellAlunoId) {
+      // Selecionar aluno pra mover
+      setSelectedAlunoId(cellAlunoId)
+    }
+  }, [editMode, mapData, mapaId, selectedAlunoId, supabase])
+
+  // Solicitar acesso
+  async function handleRequestAccess() {
+    toast.info('Funcionalidade em breve! Por enquanto, peça ao coordenador para convidá-lo.')
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent mx-auto" />
+          <p className="mt-3 text-sm text-muted-foreground">Carregando mapa...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !mapData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="text-center max-w-xs">
           <AlertCircle className="size-12 text-muted-foreground mx-auto" />
           <h1 className="mt-4 text-xl font-semibold">Mapa não encontrado</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Este link pode estar expirado ou desativado. Peça ao professor um link atualizado.
+            Este link pode estar expirado ou desativado.
           </p>
         </div>
       </div>
     )
   }
 
-  const mapData = data as PublicMapData
-  // Forcar Number() nas chaves pra evitar mismatch string/number do JSONB
+  // Não logado → pedir login
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="text-center max-w-sm space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100">
+            <Lock className="size-8 text-emerald-600" />
+          </div>
+          <h1 className="text-xl font-bold">
+            {mapData.turma.serie} {mapData.turma.turma}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Prof. {mapData.professor.nome} · {mapData.turma.turno}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Faça login para visualizar e editar o mapa de sala.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Button render={<Link href={`/login?redirect=/mapa/${shareCode}`} />}>
+              <LogIn className="size-4 mr-1.5" />
+              Entrar
+            </Button>
+            <Button variant="outline" render={<Link href={`/signup?redirect=/mapa/${shareCode}`} />}>
+              Criar conta
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            SalaMap · Mapa de sala interativo
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Logado mas sem permissão
+  if (accessLevel === 'none') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="text-center max-w-sm space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100">
+            <Lock className="size-8 text-amber-600" />
+          </div>
+          <h1 className="text-xl font-bold">
+            {mapData.turma.serie} {mapData.turma.turma}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Olá, {userName}! Você ainda não tem acesso a este mapa.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Peça ao coordenador para convidá-lo ou entre na equipe da escola.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={handleRequestAccess}>
+              <UserPlus className="size-4 mr-1.5" />
+              Solicitar acesso
+            </Button>
+            <Button variant="outline" render={<Link href="/dashboard" />}>
+              Ir para o Início
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Logado com permissão — mostrar mapa
   const alunoMap = new Map(
     (mapData.alunos || []).map((a) => [Number(a.id), a])
   )
-
   const updatedAt = mapData.mapa.updated_at
-  const updatedAtFormatted = updatedAt
-    ? new Date(updatedAt).toLocaleString('pt-BR')
-    : null
+  const updatedAtFormatted = updatedAt ? new Date(updatedAt).toLocaleString('pt-BR') : null
   const updatedAtRelative = updatedAt ? timeAgo(updatedAt) : null
-
   const placedCount = mapData.mapa.grid.reduce(
     (sum, row) => sum + row.filter((c) => c.alunoId != null).length, 0
   )
@@ -64,7 +333,7 @@ export default async function PublicMapPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header — sticky, compact */}
+      {/* Header */}
       <header className="sticky top-0 z-10 border-b bg-white/95 backdrop-blur-sm shadow-sm">
         <div className="mx-auto max-w-3xl px-4 py-2.5">
           <div className="flex items-center justify-between">
@@ -81,32 +350,62 @@ export default async function PublicMapPage({ params }: PageProps) {
                 </span>
               </div>
             </div>
-            {updatedAtRelative && (
-              <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-medium text-emerald-700">
-                <RefreshCw className="size-2.5" />
-                {updatedAtRelative}
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {updatedAtRelative && (
+                <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-medium text-emerald-700">
+                  <RefreshCw className="size-2.5" />
+                  {updatedAtRelative}
+                </div>
+              )}
+              <Badge variant="outline" className="text-[10px]">
+                {accessLevel === 'editor' ? (
+                  <><Pencil className="size-2.5 mr-0.5" /> Editor</>
+                ) : (
+                  <><Eye className="size-2.5 mr-0.5" /> Visualizador</>
+                )}
+              </Badge>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-4 space-y-4">
-        {/* Stats bar */}
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Users className="size-3" />
-            <span>{placedCount}/{totalAlunos} alunos posicionados</span>
-          </div>
-          {updatedAtFormatted && (
-            <div className="flex items-center gap-1 ml-auto">
-              <Clock className="size-3" />
-              <span>{updatedAtFormatted}</span>
+        {/* Stats + Edit toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Users className="size-3" />
+              <span>{placedCount}/{totalAlunos} alunos</span>
             </div>
+            {updatedAtFormatted && (
+              <div className="flex items-center gap-1">
+                <Clock className="size-3" />
+                <span>{updatedAtFormatted}</span>
+              </div>
+            )}
+          </div>
+          {accessLevel === 'editor' && (
+            <Button
+              variant={editMode ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => { setEditMode(!editMode); setSelectedAlunoId(null) }}
+            >
+              <Pencil className="size-3.5 mr-1" />
+              {editMode ? 'Editando' : 'Editar'}
+            </Button>
           )}
         </div>
 
-        {/* Map grid */}
+        {/* Edit instructions */}
+        {editMode && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            {selectedAlunoId
+              ? '👆 Agora clique na carteira de destino para mover o aluno.'
+              : '👆 Clique em um aluno posicionado para selecioná-lo e depois clique na nova carteira.'}
+          </div>
+        )}
+
+        {/* Map grid — com clique pra edição */}
         <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
           <div className="p-2 sm:p-3">
             <PublicGrid
@@ -114,6 +413,9 @@ export default async function PublicMapPage({ params }: PageProps) {
               colunas={mapData.mapa.colunas}
               alunoMap={alunoMap}
               roomConfig={mapData.mapa.room_config}
+              editable={editMode}
+              selectedAlunoId={selectedAlunoId}
+              onCellClick={editMode ? handleCellClick : undefined}
             />
           </div>
         </div>
@@ -134,7 +436,7 @@ export default async function PublicMapPage({ params }: PageProps) {
         {/* Footer */}
         <div className="text-center pb-6 pt-2">
           <p className="text-[10px] text-muted-foreground">
-            SalaMap · Mapa sempre atualizado
+            {userName && `Logado como ${userName} · `}SalaMap
           </p>
         </div>
       </main>
