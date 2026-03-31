@@ -43,6 +43,10 @@ export default function EscolaPage() {
     id: number; serie: string; turma: string; turno: string
     updated_at?: string; owner: { nome: string }; alunos_count: number
   }>>([])
+  const [pendingRequests, setPendingRequests] = useState<Array<{
+    id: number; turma_id: number; user_id: string
+    turma_nome: string; user_nome: string; user_email: string; created_at: string
+  }>>([])
 
   const fetchData = useCallback(async () => {
     try {
@@ -122,6 +126,27 @@ export default function EscolaPage() {
           })))
         }
       }
+      // Buscar solicitações de acesso pendentes (das minhas turmas)
+      const { data: requests } = await supabase
+        .from('solicitacoes_acesso')
+        .select('id, turma_id, user_id, created_at, turma:sala_turmas(serie, turma), profile:profiles(nome, email)')
+        .eq('status', 'pendente')
+
+      if (requests && Array.isArray(requests)) {
+        setPendingRequests(requests.map((r: Record<string, unknown>) => {
+          const turma = Array.isArray(r.turma) ? r.turma[0] : r.turma
+          const profile = Array.isArray(r.profile) ? r.profile[0] : r.profile
+          return {
+            id: r.id as number,
+            turma_id: r.turma_id as number,
+            user_id: r.user_id as string,
+            turma_nome: turma ? `${(turma as Record<string, string>).serie} ${(turma as Record<string, string>).turma}` : 'Turma',
+            user_nome: (profile as Record<string, string>)?.nome || 'Usuário',
+            user_email: (profile as Record<string, string>)?.email || '',
+            created_at: r.created_at as string,
+          }
+        }))
+      }
     } catch (err) {
       console.error('[SalaMap] Escola page error:', err)
     } finally {
@@ -184,6 +209,41 @@ export default function EscolaPage() {
     }
   }
 
+  async function handleAcceptRequest(requestId: number, turmaId: number, requestUserId: string) {
+    try {
+      // Criar compartilhamento como editor
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      await supabase.from('turma_compartilhamentos').insert({
+        turma_id: turmaId,
+        user_id: requestUserId,
+        email: '', // será preenchido
+        papel: 'editor',
+        status: 'aceito',
+        convidado_por: user.id,
+      })
+
+      // Atualizar solicitação
+      await supabase.from('solicitacoes_acesso').update({ status: 'aceito' }).eq('id', requestId)
+
+      setPendingRequests(prev => prev.filter(r => r.id !== requestId))
+      toast.success('Acesso aprovado!')
+    } catch {
+      toast.error('Erro ao aprovar acesso.')
+    }
+  }
+
+  async function handleRejectRequest(requestId: number) {
+    try {
+      await supabase.from('solicitacoes_acesso').update({ status: 'recusado' }).eq('id', requestId)
+      setPendingRequests(prev => prev.filter(r => r.id !== requestId))
+      toast.success('Solicitação recusada.')
+    } catch {
+      toast.error('Erro ao recusar.')
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -228,6 +288,54 @@ export default function EscolaPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Solicitações de acesso pendentes */}
+      {pendingRequests.length > 0 && (
+        <Card className="border-orange-200/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <UserPlus className="size-4 text-orange-600" />
+              <CardTitle className="text-sm">
+                Solicitações de Acesso ({pendingRequests.length})
+              </CardTitle>
+            </div>
+            <CardDescription className="text-xs">
+              Professores solicitando acesso às suas turmas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {pendingRequests.map((r) => (
+                <div key={r.id} className="flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50/30 px-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{r.user_nome}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {r.user_email} · Turma: {r.turma_nome}
+                    </p>
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700"
+                      onClick={() => handleAcceptRequest(r.id, r.turma_id, r.user_id)}
+                    >
+                      <Check className="size-3 mr-0.5" /> Aceitar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => handleRejectRequest(r.id)}
+                    >
+                      Recusar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Minhas equipes */}
       {allEscolas.length > 1 && (

@@ -46,6 +46,9 @@ export default function SharedMapPage() {
   const [editMode, setEditMode] = useState(false)
   const [selectedAlunoId, setSelectedAlunoId] = useState<number | null>(null)
   const [mapaId, setMapaId] = useState<number | null>(null)
+  const [turmaId, setTurmaId] = useState<number | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [requestSent, setRequestSent] = useState(false)
   const [lastEditor, setLastEditor] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
@@ -64,6 +67,14 @@ export default function SharedMapPage() {
       setMapData(data as PublicMapData)
       setMapaId((data as PublicMapData).mapa.id)
 
+      // Buscar turma_id real
+      const { data: mapaInfo } = await supabase
+        .from('mapas')
+        .select('turma_id')
+        .eq('id', (data as PublicMapData).mapa.id)
+        .single()
+      if (mapaInfo) setTurmaId(mapaInfo.turma_id as number)
+
       // Verificar se está logado
       const { data: { user } } = await supabase.auth.getUser()
 
@@ -75,6 +86,15 @@ export default function SharedMapPage() {
       }
 
       setIsLoggedIn(true)
+      setUserId(user.id)
+
+      // Verificar se já solicitou acesso
+      const { data: existingRequest } = await supabase
+        .from('solicitacoes_acesso')
+        .select('id, status')
+        .eq('user_id', user.id)
+        .single()
+      if (existingRequest) setRequestSent(true)
 
       // Buscar nome do usuário
       const { data: profile } = await supabase
@@ -226,7 +246,28 @@ export default function SharedMapPage() {
 
   // Solicitar acesso
   async function handleRequestAccess() {
-    toast.info('Funcionalidade em breve! Por enquanto, peça ao coordenador para convidá-lo.')
+    if (!userId || !turmaId) {
+      toast.error('Erro ao solicitar acesso.')
+      return
+    }
+    try {
+      const { error } = await supabase.from('solicitacoes_acesso').insert({
+        turma_id: turmaId,
+        user_id: userId,
+      })
+      if (error) {
+        if (error.message.includes('duplicate') || error.message.includes('unique')) {
+          toast.info('Você já solicitou acesso. Aguarde a aprovação.')
+        } else {
+          throw error
+        }
+      } else {
+        toast.success('Solicitação enviada! O coordenador será notificado.')
+      }
+      setRequestSent(true)
+    } catch {
+      toast.error('Erro ao solicitar acesso.')
+    }
   }
 
   if (loading) {
@@ -306,10 +347,17 @@ export default function SharedMapPage() {
             Peça ao coordenador para convidá-lo ou entre na equipe da escola.
           </p>
           <div className="flex gap-2 justify-center">
-            <Button onClick={handleRequestAccess}>
-              <UserPlus className="size-4 mr-1.5" />
-              Solicitar acesso
-            </Button>
+            {requestSent ? (
+              <Button disabled variant="outline">
+                <Clock className="size-4 mr-1.5" />
+                Solicitação enviada
+              </Button>
+            ) : (
+              <Button onClick={handleRequestAccess}>
+                <UserPlus className="size-4 mr-1.5" />
+                Solicitar acesso
+              </Button>
+            )}
             <Button variant="outline" render={<Link href="/dashboard" />}>
               Ir para o Início
             </Button>

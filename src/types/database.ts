@@ -134,6 +134,15 @@ export interface EscolaMembro {
   created_at: string
 }
 
+// Solicitação de acesso
+export interface SolicitacaoAcesso {
+  id: number
+  turma_id: number
+  user_id: string
+  status: 'pendente' | 'aceito' | 'recusado'
+  created_at: string
+}
+
 export interface PublicMapData {
   mapa: {
     id: number
