@@ -190,11 +190,13 @@ export default function MapaEditorPage() {
     const newGrid = grid.map(r => r.map(c => ({ ...c })))
     newGrid[row][col].alunoId = null
     setGrid(newGrid)
-    // Selecionar o aluno removido pra poder reposicionar
+    // Selecionar o aluno removido pra poder reposicionar com próximo clique
+    // NÃO salvar aqui — salva quando o aluno for reposicionado
     if (removedAlunoId) {
       setSelectedStudentId(Number(removedAlunoId))
+    } else {
+      triggerSave()
     }
-    triggerSave()
   }, [grid, triggerSave])
 
   const handleCellSwap = useCallback((fR: number, fC: number, tR: number, tC: number) => {
