@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { getCellBlockId, shortName } from '@/lib/map/utils'
+import { getCellBlockId, displayName } from '@/lib/map/utils'
 import { Ban } from 'lucide-react'
 import { ClassroomFrame } from '@/components/map-editor/classroom-frame'
 import type { Grid, RoomConfig } from '@/types/database'
@@ -9,7 +9,7 @@ import type { Grid, RoomConfig } from '@/types/database'
 interface PublicGridProps {
   grid: Grid
   colunas: number
-  alunoMap: Map<number, { nome: string; numero: number | null }>
+  alunoMap: Map<number, { nome: string; numero: number | null; apelido?: string | null }>
   roomConfig?: RoomConfig | null
 }
 
@@ -29,6 +29,7 @@ function getDeskConnections(grid: Grid, row: number, col: number) {
 }
 
 export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridProps) {
+  const allAlunos = Array.from(alunoMap.values())
   return (
     <ClassroomFrame roomConfig={roomConfig} compact>
       <div
@@ -107,7 +108,7 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
                         </span>
                       </div>
                       <span className="text-[9px] sm:text-[10px] text-gray-700 truncate block leading-tight max-w-full font-medium">
-                        {shortName(aluno.nome)}
+                        {displayName(aluno, allAlunos)}
                       </span>
                     </>
                   ) : null}

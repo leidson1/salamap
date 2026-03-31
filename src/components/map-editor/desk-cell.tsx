@@ -2,7 +2,7 @@
 
 import { useDroppable, useDraggable } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
-import { shortName } from '@/lib/map/utils'
+import { displayName } from '@/lib/map/utils'
 import { StudentCard } from './student-card'
 import { X, Ban } from 'lucide-react'
 import type { GridCell, Aluno } from '@/types/database'
@@ -90,7 +90,7 @@ export function DeskCell({ cell, row, col, aluno, mode, onToggleType, onRemoveSt
             ) : (
               <div className="text-center">
                 <span className="text-[10px] font-bold text-emerald-700">{aluno.numero ?? '?'}</span>
-                <span className="text-[9px] text-amber-900 block truncate px-1">{shortName(aluno.nome)}</span>
+                <span className="text-[9px] text-amber-900 block truncate px-1">{displayName(aluno)}</span>
               </div>
             )}
           </div>

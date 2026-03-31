@@ -80,3 +80,49 @@ export function shortName(fullName: string): string {
   const lastInitial = parts[parts.length - 1][0]?.toUpperCase()
   return lastInitial ? `${first} ${lastInitial}.` : first
 }
+
+/**
+ * Nome de exibição: usa apelido se existir, senão nome curto inteligente.
+ * Quando há nomes duplicados, expande as iniciais pra diferenciar.
+ */
+export function displayName(aluno: { nome: string; apelido?: string | null }, allAlunos?: Array<{ nome: string; apelido?: string | null }>): string {
+  // Se tem apelido, usa direto
+  if (aluno.apelido?.trim()) return aluno.apelido.trim()
+
+  const parts = aluno.nome.trim().split(/\s+/)
+  if (parts.length <= 1) return parts[0] || ''
+
+  const firstName = parts[0]
+
+  // Se não tem lista pra comparar, usa shortName padrão
+  if (!allAlunos || allAlunos.length === 0) return shortName(aluno.nome)
+
+  // Verifica se há outros com mesmo primeiro nome (sem apelido)
+  const sameFirst = allAlunos.filter(a =>
+    !a.apelido?.trim() &&
+    a.nome.trim().split(/\s+/)[0] === firstName
+  )
+
+  // Se é único, só primeiro nome basta
+  if (sameFirst.length <= 1) return firstName
+
+  // Vai expandindo sobrenome até diferenciar
+  const restParts = parts.slice(1)
+  for (let chars = 1; chars <= 10; chars++) {
+    const suffix = restParts.map(p => p.substring(0, chars)).join(' ')
+    const candidate = `${firstName} ${suffix}.`
+
+    const othersWithSame = sameFirst.filter(a => {
+      if (a.nome === aluno.nome) return false
+      const oParts = a.nome.trim().split(/\s+/)
+      const oRest = oParts.slice(1)
+      const oSuffix = oRest.map(p => p.substring(0, chars)).join(' ')
+      return `${oParts[0]} ${oSuffix}.` === candidate
+    })
+
+    if (othersWithSame.length === 0) return candidate
+  }
+
+  // Fallback: nome completo
+  return aluno.nome
+}

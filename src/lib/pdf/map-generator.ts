@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf'
 import { generateQrDataUrl } from '@/components/qr-code-card'
 import type { Grid, RoomConfig } from '@/types/database'
-import { getCellBlockId, shortName } from '@/lib/map/utils'
+import { getCellBlockId, displayName } from '@/lib/map/utils'
 
 interface MapPdfOptions {
   grid: Grid
@@ -10,7 +10,7 @@ interface MapPdfOptions {
   serie: string
   turma: string
   turno: string
-  alunoMap: Map<number, { nome: string; numero: number | null }>
+  alunoMap: Map<number, { nome: string; numero: number | null; apelido?: string | null }>
   shareUrl?: string
   roomConfig?: RoomConfig | null
   escolaNome?: string
@@ -198,6 +198,7 @@ export function generateMapPdf(options: MapPdfOptions) {
   }
 
   // --- Desks ---
+  const allAlunosList = Array.from(alunoMap.values())
   grid.forEach((row, rIdx) => {
     row.forEach((cell, cIdx) => {
       const x = gridStartX + cIdx * (cellW + gap)
@@ -269,9 +270,9 @@ export function generateMapPdf(options: MapPdfOptions) {
         doc.setFontSize(4.5)
         doc.setFont('helvetica', 'normal')
         const maxChars = Math.floor(cellW / 1.8)
-        const nome = shortName(aluno.nome)
-        const displayName = nome.length > maxChars ? nome.substring(0, maxChars) + '..' : nome
-        doc.text(displayName, x + cellW / 2, y + deskH * 0.68, { align: 'center' })
+        const nome = displayName(aluno, allAlunosList)
+        const nomeExibido = nome.length > maxChars ? nome.substring(0, maxChars) + '..' : nome
+        doc.text(nomeExibido, x + cellW / 2, y + deskH * 0.68, { align: 'center' })
       }
 
       // Chair

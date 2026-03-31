@@ -2,7 +2,7 @@
 
 import { useDraggable } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
-import { shortName } from '@/lib/map/utils'
+import { displayName } from '@/lib/map/utils'
 import type { Aluno } from '@/types/database'
 
 interface StudentCardProps {
@@ -37,7 +37,7 @@ export function StudentCard({ aluno, isInGrid = false, compact = false }: Studen
         title={`${aluno.numero ?? ''} - ${aluno.nome}`}
       >
         <span className="font-bold text-emerald-700">{aluno.numero ?? '?'}</span>{' '}
-        {shortName(aluno.nome)}
+        {displayName(aluno)}
       </div>
     )
   }

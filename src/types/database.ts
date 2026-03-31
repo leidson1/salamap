@@ -21,6 +21,7 @@ export interface Aluno {
   user_id: string
   turma_id: number
   nome: string
+  apelido: string | null
   numero: number | null
   ativo: boolean
   created_at: string
