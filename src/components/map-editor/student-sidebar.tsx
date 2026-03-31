@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { Search, UserRound, Plus, X } from 'lucide-react'
+import { displayName } from '@/lib/map/utils'
+import { Search, UserRound, Plus, X, Pencil } from 'lucide-react'
 import type { Aluno } from '@/types/database'
 
 interface StudentSidebarProps {
@@ -14,13 +15,16 @@ interface StudentSidebarProps {
   selectedStudentId?: number | null
   onSelectStudent?: (alunoId: number | null) => void
   onAddStudent?: (nome: string) => Promise<void>
+  onUpdateApelido?: (alunoId: number, apelido: string) => Promise<void>
 }
 
-export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectStudent, onAddStudent }: StudentSidebarProps) {
+export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectStudent, onAddStudent, onUpdateApelido }: StudentSidebarProps) {
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [newName, setNewName] = useState('')
   const [adding, setAdding] = useState(false)
+  const [editingApelidoId, setEditingApelidoId] = useState<number | null>(null)
+  const [apelidoInput, setApelidoInput] = useState('')
 
   const unplacedAlunos = alunos
     .filter((a) => !placedIds.includes(a.id))
@@ -31,7 +35,8 @@ export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectS
         : true
     )
 
-  const placedCount = alunos.filter((a) => placedIds.includes(a.id)).length
+  const placedAlunos = alunos.filter((a) => placedIds.includes(a.id))
+  const placedCount = placedAlunos.length
 
   async function handleAdd() {
     if (!newName.trim() || !onAddStudent) return
@@ -42,6 +47,18 @@ export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectS
       setShowAdd(false)
     } catch { /* handled by parent */ }
     finally { setAdding(false) }
+  }
+
+  async function handleSaveApelido(alunoId: number) {
+    if (!onUpdateApelido) return
+    await onUpdateApelido(alunoId, apelidoInput.trim())
+    setEditingApelidoId(null)
+    setApelidoInput('')
+  }
+
+  function startEditApelido(aluno: Aluno) {
+    setEditingApelidoId(aluno.id)
+    setApelidoInput(aluno.apelido || '')
   }
 
   return (
@@ -80,7 +97,6 @@ export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectS
           )}
         </div>
 
-        {/* Adicionar aluno inline */}
         {showAdd && onAddStudent && (
           <div className="mt-2 flex gap-2">
             <Input
@@ -104,8 +120,9 @@ export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectS
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5 max-h-[calc(100vh-320px)] lg:max-h-[calc(100vh-220px)]">
-        {unplacedAlunos.length === 0 ? (
+      <div className="flex-1 overflow-y-auto p-2 space-y-1 max-h-[calc(100vh-320px)] lg:max-h-[calc(100vh-220px)]">
+        {/* Alunos não posicionados */}
+        {unplacedAlunos.length === 0 && placedAlunos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <UserRound className="size-8 text-muted-foreground/50" />
             <p className="mt-2 text-xs text-muted-foreground">
@@ -122,29 +139,86 @@ export function StudentSidebar({ alunos, placedIds, selectedStudentId, onSelectS
             )}
           </div>
         ) : (
-          unplacedAlunos.map((aluno) => (
-            <div
-              key={aluno.id}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('text/plain', String(aluno.id))
-                e.dataTransfer.effectAllowed = 'move'
-                onSelectStudent?.(aluno.id)
-              }}
-              onClick={() => onSelectStudent?.(selectedStudentId === aluno.id ? null : aluno.id)}
-              className={cn(
-                'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-grab active:cursor-grabbing transition-all select-none',
-                selectedStudentId === aluno.id
-                  ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-300 shadow-md'
-                  : 'bg-white hover:shadow-md hover:border-emerald-300'
-              )}
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
-                {aluno.numero ?? '?'}
-              </span>
-              <span className="truncate font-medium">{aluno.nome}</span>
-            </div>
-          ))
+          <>
+            {unplacedAlunos.length > 0 && (
+              <div className="space-y-1.5">
+                {unplacedAlunos.map((aluno) => (
+                  <div
+                    key={aluno.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', String(aluno.id))
+                      e.dataTransfer.effectAllowed = 'move'
+                      onSelectStudent?.(aluno.id)
+                    }}
+                    onClick={() => onSelectStudent?.(selectedStudentId === aluno.id ? null : aluno.id)}
+                    className={cn(
+                      'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-grab active:cursor-grabbing transition-all select-none',
+                      selectedStudentId === aluno.id
+                        ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-300 shadow-md'
+                        : 'bg-white hover:shadow-md hover:border-emerald-300'
+                    )}
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
+                      {aluno.numero ?? '?'}
+                    </span>
+                    <span className="truncate font-medium">{aluno.nome}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Alunos posicionados — com opção de apelido */}
+            {placedAlunos.length > 0 && (
+              <div className="mt-3 space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide px-1 mb-1">
+                  Posicionados ({placedAlunos.length})
+                </p>
+                {placedAlunos.map((aluno) => (
+                  <div
+                    key={aluno.id}
+                    className="flex items-center gap-2 rounded-lg border border-emerald-200/60 bg-emerald-50/30 px-2.5 py-1.5 text-sm"
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-200 text-[10px] font-bold text-emerald-700">
+                      {aluno.numero ?? '?'}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      {editingApelidoId === aluno.id ? (
+                        <Input
+                          value={apelidoInput}
+                          onChange={(e) => setApelidoInput(e.target.value)}
+                          placeholder={displayName(aluno)}
+                          className="h-6 text-xs px-1.5"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveApelido(aluno.id)
+                            if (e.key === 'Escape') setEditingApelidoId(null)
+                          }}
+                          onBlur={() => handleSaveApelido(aluno.id)}
+                        />
+                      ) : (
+                        <span className="text-xs truncate block">
+                          {displayName(aluno)}
+                          {aluno.apelido && (
+                            <span className="text-[10px] text-muted-foreground ml-1">({aluno.nome.split(' ')[0]})</span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    {onUpdateApelido && editingApelidoId !== aluno.id && (
+                      <button
+                        onClick={() => startEditApelido(aluno)}
+                        className="shrink-0 text-muted-foreground hover:text-emerald-600 transition-colors"
+                        title="Editar apelido na carteira"
+                      >
+                        <Pencil className="size-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

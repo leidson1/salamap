@@ -619,6 +619,15 @@ export default function MapaEditorPage() {
               if (error) { toast.error('Erro ao adicionar aluno.'); throw error }
               if (data) setAlunos(prev => [...prev, data as Aluno])
             }}
+            onUpdateApelido={async (alunoId, apelido) => {
+              const { error } = await supabase
+                .from('sala_alunos')
+                .update({ apelido: apelido || null })
+                .eq('id', alunoId)
+              if (error) { toast.error('Erro ao salvar apelido.'); return }
+              setAlunos(prev => prev.map(a => a.id === alunoId ? { ...a, apelido: apelido || null } : a))
+              triggerSave()
+            }}
           />
         )}
 
