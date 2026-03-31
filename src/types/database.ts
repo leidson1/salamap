@@ -146,6 +146,7 @@ export interface SolicitacaoAcesso {
 export interface PublicMapData {
   mapa: {
     id: number
+    turma_id?: number
     nome: string
     linhas: number
     colunas: number

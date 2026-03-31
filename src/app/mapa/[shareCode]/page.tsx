@@ -66,16 +66,10 @@ export default function SharedMapPage() {
 
       setMapData(data as PublicMapData)
       setMapaId((data as PublicMapData).mapa.id)
-
-      // Buscar turma_id real (pode falhar por RLS — fallback silencioso)
-      try {
-        const { data: mapaInfo } = await supabase
-          .from('mapas')
-          .select('turma_id')
-          .eq('id', (data as PublicMapData).mapa.id)
-          .maybeSingle()
-        if (mapaInfo) setTurmaId(mapaInfo.turma_id as number)
-      } catch {}
+      // turma_id vem da RPC
+      if ((data as PublicMapData).mapa.turma_id) {
+        setTurmaId((data as PublicMapData).mapa.turma_id!)
+      }
 
       // Verificar se está logado
       const { data: { user } } = await supabase.auth.getUser()
@@ -112,96 +106,50 @@ export default function SharedMapPage() {
       // Verificar permissão
       const md = data as PublicMapData
 
-      // Verificar permissões (tudo em try/catch — pode falhar por RLS)
-      try {
-        // Verificar se é dono da turma
-        const { data: turmaCheck } = await supabase
-          .from('mapas')
-          .select('turma_id, user_id, turma:sala_turmas(user_id)')
-          .eq('id', md.mapa.id)
-          .maybeSingle()
+      // Verificar permissões usando turma_id da RPC
+      const rpcTurmaId = md.mapa.turma_id
+      let foundAccess = false
 
-      if (turmaCheck) {
-        const turmaOwner = Array.isArray(turmaCheck.turma) ? turmaCheck.turma[0] : turmaCheck.turma
-        if (turmaCheck.user_id === user.id || (turmaOwner as { user_id: string })?.user_id === user.id) {
-          setAccessLevel('editor')
-          setLoading(false)
-          return
-        }
-
-        // Verificar se é membro da mesma escola
-        const realTurmaId = turmaCheck.turma_id
-
-        // Verificar compartilhamento direto
-        const { data: shareCheck } = await supabase
-          .from('turma_compartilhamentos')
-          .select('papel')
-          .eq('turma_id', realTurmaId)
-          .eq('user_id', user.id)
-          .eq('status', 'aceito')
-          .single()
-
-        if (shareCheck) {
-          setAccessLevel(shareCheck.papel === 'editor' ? 'editor' : 'viewer')
-          setLoading(false)
-          return
-        }
-
-        // Verificar se é da mesma escola (coordenador = editor, professor = viewer)
-        const ownerUserId = (turmaOwner as { user_id: string })?.user_id
-        if (ownerUserId) {
-          const { data: ownerEscola } = await supabase
-            .from('escolas')
-            .select('id')
-            .eq('criado_por', ownerUserId)
-            .single()
-
-          if (ownerEscola) {
-            const { data: myMembership } = await supabase
-              .from('escola_membros')
-              .select('papel')
-              .eq('escola_id', ownerEscola.id)
-              .eq('user_id', user.id)
-              .single()
-
-            if (myMembership) {
-              setAccessLevel(myMembership.papel === 'coordenador' ? 'editor' : 'viewer')
-              setLoading(false)
-              return
-            }
+      // 1. Dono da turma → editor
+      if (rpcTurmaId) {
+        try {
+          const { data: turmaOwner } = await supabase
+            .from('sala_turmas').select('user_id').eq('id', rpcTurmaId).maybeSingle()
+          if (turmaOwner?.user_id === user.id) {
+            setAccessLevel('editor')
+            foundAccess = true
           }
-
-          // Verificar também escola do membro (não só criador)
-          const { data: myEscolas } = await supabase
-            .from('escola_membros')
-            .select('escola_id')
-            .eq('user_id', user.id)
-
-          if (myEscolas) {
-            for (const me of myEscolas) {
-              const { data: ownerInSameEscola } = await supabase
-                .from('escola_membros')
-                .select('user_id')
-                .eq('escola_id', me.escola_id)
-                .eq('user_id', ownerUserId)
-                .single()
-
-              if (ownerInSameEscola) {
-                setAccessLevel('viewer')
-                setLoading(false)
-                return
-              }
-            }
-          }
-        }
+        } catch {}
       }
 
-      } catch (permErr) {
-        console.error('[SalaMap] Permission check failed:', permErr)
+      // 2. Compartilhamento direto
+      if (!foundAccess && rpcTurmaId) {
+        try {
+          const { data: shareCheck } = await supabase
+            .from('turma_compartilhamentos').select('papel')
+            .eq('turma_id', rpcTurmaId).eq('user_id', user.id).eq('status', 'aceito')
+            .maybeSingle()
+          if (shareCheck) {
+            setAccessLevel(shareCheck.papel === 'editor' ? 'editor' : 'viewer')
+            foundAccess = true
+          }
+        } catch {}
       }
 
-      // Logado mas sem permissão (ou check falhou)
-      if (accessLevel === 'none') setAccessLevel('none')
+      // 3. Membro da mesma escola → viewer (coordenador → editor)
+      if (!foundAccess) {
+        try {
+          const { data: myMemberships } = await supabase
+            .from('escola_membros').select('papel').eq('user_id', user.id)
+          if (myMemberships && myMemberships.length > 0) {
+            const bestRole = myMemberships.some((m: Record<string, unknown>) => m.papel === 'coordenador') ? 'editor' : 'viewer'
+            setAccessLevel(bestRole)
+            foundAccess = true
+          }
+        } catch {}
+      }
+
+      if (!foundAccess) setAccessLevel('none')
     } catch (err) {
       console.error('[SalaMap] Shared map error:', err)
       setError(true)
