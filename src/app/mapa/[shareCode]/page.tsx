@@ -67,13 +67,15 @@ export default function SharedMapPage() {
       setMapData(data as PublicMapData)
       setMapaId((data as PublicMapData).mapa.id)
 
-      // Buscar turma_id real
-      const { data: mapaInfo } = await supabase
-        .from('mapas')
-        .select('turma_id')
-        .eq('id', (data as PublicMapData).mapa.id)
-        .single()
-      if (mapaInfo) setTurmaId(mapaInfo.turma_id as number)
+      // Buscar turma_id real (pode falhar por RLS — fallback silencioso)
+      try {
+        const { data: mapaInfo } = await supabase
+          .from('mapas')
+          .select('turma_id')
+          .eq('id', (data as PublicMapData).mapa.id)
+          .maybeSingle()
+        if (mapaInfo) setTurmaId(mapaInfo.turma_id as number)
+      } catch {}
 
       // Verificar se está logado
       const { data: { user } } = await supabase.auth.getUser()
@@ -88,13 +90,15 @@ export default function SharedMapPage() {
       setIsLoggedIn(true)
       setUserId(user.id)
 
-      // Verificar se já solicitou acesso
-      const { data: existingRequest } = await supabase
-        .from('solicitacoes_acesso')
-        .select('id, status')
-        .eq('user_id', user.id)
-        .single()
-      if (existingRequest) setRequestSent(true)
+      // Verificar se já solicitou acesso (tabela pode não existir)
+      try {
+        const { data: existingRequest } = await supabase
+          .from('solicitacoes_acesso')
+          .select('id, status')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (existingRequest) setRequestSent(true)
+      } catch {}
 
       // Buscar nome do usuário
       const { data: profile } = await supabase
@@ -107,14 +111,15 @@ export default function SharedMapPage() {
 
       // Verificar permissão
       const md = data as PublicMapData
-      const turmaId = md.mapa.id // precisamos do turma_id real
 
-      // Verificar se é dono da turma
-      const { data: turmaCheck } = await supabase
-        .from('mapas')
-        .select('turma_id, user_id, turma:sala_turmas(user_id)')
-        .eq('id', md.mapa.id)
-        .single()
+      // Verificar permissões (tudo em try/catch — pode falhar por RLS)
+      try {
+        // Verificar se é dono da turma
+        const { data: turmaCheck } = await supabase
+          .from('mapas')
+          .select('turma_id, user_id, turma:sala_turmas(user_id)')
+          .eq('id', md.mapa.id)
+          .maybeSingle()
 
       if (turmaCheck) {
         const turmaOwner = Array.isArray(turmaCheck.turma) ? turmaCheck.turma[0] : turmaCheck.turma
@@ -191,8 +196,12 @@ export default function SharedMapPage() {
         }
       }
 
-      // Logado mas sem permissão
-      setAccessLevel('none')
+      } catch (permErr) {
+        console.error('[SalaMap] Permission check failed:', permErr)
+      }
+
+      // Logado mas sem permissão (ou check falhou)
+      if (accessLevel === 'none') setAccessLevel('none')
     } catch (err) {
       console.error('[SalaMap] Shared map error:', err)
       setError(true)
