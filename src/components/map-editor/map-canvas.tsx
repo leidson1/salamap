@@ -6,7 +6,7 @@ import type Konva from 'konva'
 import type { FurnitureTool } from '@/lib/map/furniture-tools'
 import type { Grid, Aluno, RoomConfig } from '@/types/database'
 import { clampWallPosition } from '@/lib/map/room-config'
-import { getCellBlockId } from '@/lib/map/utils'
+import { getCellBlockId, shortName } from '@/lib/map/utils'
 import { DEFAULT_ROOM_CONFIG } from '@/types/database'
 
 // Layout constants
@@ -223,7 +223,7 @@ function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, 
           />
           <Text
             x={4} y={deskH * 0.52} width={w - 8}
-            text={studentName?.split(' ')[0] ?? ''}
+            text={studentName ?? ''}
             fontSize={10} fill={COLORS.studentName}
             align="center" ellipsis wrap="none"
           />
@@ -774,7 +774,7 @@ export function MapCanvas({
                   <DeskShape
                     x={pos.x} y={pos.y} w={CELL_W} h={CELL_H}
                     occupied={!!aluno}
-                    studentName={aluno?.nome}
+                    studentName={aluno ? shortName(aluno.nome) : undefined}
                     studentNum={aluno?.numero}
                     isDragOver={isOver}
                     selected={selected}

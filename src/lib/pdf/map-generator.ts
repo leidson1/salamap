@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf'
 import { generateQrDataUrl } from '@/components/qr-code-card'
 import type { Grid, RoomConfig } from '@/types/database'
-import { getCellBlockId } from '@/lib/map/utils'
+import { getCellBlockId, shortName } from '@/lib/map/utils'
 
 interface MapPdfOptions {
   grid: Grid
@@ -269,7 +269,7 @@ export function generateMapPdf(options: MapPdfOptions) {
         doc.setFontSize(4.5)
         doc.setFont('helvetica', 'normal')
         const maxChars = Math.floor(cellW / 1.8)
-        const nome = aluno.nome.split(' ')[0]
+        const nome = shortName(aluno.nome)
         const displayName = nome.length > maxChars ? nome.substring(0, maxChars) + '..' : nome
         doc.text(displayName, x + cellW / 2, y + deskH * 0.68, { align: 'center' })
       }

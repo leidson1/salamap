@@ -69,3 +69,14 @@ export function generateShareCode(): string {
   }
   return code
 }
+
+/**
+ * Nome curto para exibição: "João S." ou "Maria" (se não tem sobrenome)
+ */
+export function shortName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length <= 1) return parts[0] || ''
+  const first = parts[0]
+  const lastInitial = parts[parts.length - 1][0]?.toUpperCase()
+  return lastInitial ? `${first} ${lastInitial}.` : first
+}

@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { getCellBlockId } from '@/lib/map/utils'
+import { getCellBlockId, shortName } from '@/lib/map/utils'
 import { Ban } from 'lucide-react'
 import { ClassroomFrame } from '@/components/map-editor/classroom-frame'
 import type { Grid, RoomConfig } from '@/types/database'
@@ -107,7 +107,7 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig }: PublicGridPr
                         </span>
                       </div>
                       <span className="text-[9px] sm:text-[10px] text-gray-700 truncate block leading-tight max-w-full font-medium">
-                        {aluno.nome.split(' ')[0]}
+                        {shortName(aluno.nome)}
                       </span>
                     </>
                   ) : null}
