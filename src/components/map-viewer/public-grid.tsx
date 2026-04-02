@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { getCellBlockId, displayName } from '@/lib/map/utils'
 import { Ban } from 'lucide-react'
@@ -14,6 +15,7 @@ interface PublicGridProps {
   editable?: boolean
   selectedAlunoId?: number | null
   onCellClick?: (row: number, col: number) => void
+  onSwapStudents?: (fromRow: number, fromCol: number, toRow: number, toCol: number) => void
 }
 
 function getDeskConnections(grid: Grid, row: number, col: number) {
@@ -31,8 +33,10 @@ function getDeskConnections(grid: Grid, row: number, col: number) {
   }
 }
 
-export function PublicGrid({ grid, colunas, alunoMap, roomConfig, editable, selectedAlunoId, onCellClick }: PublicGridProps) {
+export function PublicGrid({ grid, colunas, alunoMap, roomConfig, editable, selectedAlunoId, onCellClick, onSwapStudents }: PublicGridProps) {
   const allAlunos = Array.from(alunoMap.values())
+  const [dragOverCell, setDragOverCell] = useState<{ r: number; c: number } | null>(null)
+
   return (
     <ClassroomFrame roomConfig={roomConfig} compact>
       <div
@@ -61,6 +65,7 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig, editable, sele
             const occupied = !!aluno
             const isSelected = editable && occupied && selectedAlunoId === Number(cell.alunoId)
             const isTarget = editable && selectedAlunoId && !occupied
+            const isDragOver = dragOverCell?.r === rIdx && dragOverCell?.c === cIdx
 
             return (
               <div
@@ -70,8 +75,40 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig, editable, sele
                   editable && 'cursor-pointer',
                   isSelected && 'ring-2 ring-emerald-500 rounded-lg',
                   isTarget && 'ring-2 ring-dashed ring-emerald-300 rounded-lg',
+                  isDragOver && 'ring-2 ring-emerald-400 rounded-lg bg-emerald-50/50',
                 )}
                 onClick={() => onCellClick?.(rIdx, cIdx)}
+                // Drag & drop
+                draggable={editable && occupied}
+                onDragStart={(e) => {
+                  if (!editable || !occupied || !cell.alunoId) return
+                  e.dataTransfer.setData('text/plain', `${rIdx},${cIdx}`)
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                onDragOver={(e) => {
+                  if (!editable) return
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  setDragOverCell({ r: rIdx, c: cIdx })
+                }}
+                onDragLeave={() => {
+                  if (dragOverCell?.r === rIdx && dragOverCell?.c === cIdx) {
+                    setDragOverCell(null)
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setDragOverCell(null)
+                  if (!editable || !onSwapStudents) return
+                  const data = e.dataTransfer.getData('text/plain')
+                  const parts = data.split(',')
+                  if (parts.length !== 2) return
+                  const fromRow = parseInt(parts[0], 10)
+                  const fromCol = parseInt(parts[1], 10)
+                  if (isNaN(fromRow) || isNaN(fromCol)) return
+                  if (fromRow === rIdx && fromCol === cIdx) return
+                  onSwapStudents(fromRow, fromCol, rIdx, cIdx)
+                }}
               >
                 {/* Block connectors */}
                 {connections.left && (
@@ -110,9 +147,11 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig, editable, sele
                 <div className={cn(
                   'relative flex flex-col items-center justify-center rounded-md px-1 text-center',
                   'h-[46px] sm:h-[54px]',
-                  occupied
-                    ? 'bg-green-50 border border-green-300 shadow-sm'
-                    : 'bg-white border border-slate-200'
+                  isDragOver
+                    ? 'bg-emerald-100 border-2 border-emerald-400'
+                    : occupied
+                      ? 'bg-green-50 border border-green-300 shadow-sm'
+                      : 'bg-white border border-slate-200'
                 )}>
                   {aluno ? (
                     <>
@@ -125,6 +164,8 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig, editable, sele
                         {displayName(aluno, allAlunos)}
                       </span>
                     </>
+                  ) : isDragOver ? (
+                    <span className="text-[9px] text-emerald-600 font-medium">Soltar aqui</span>
                   ) : null}
                 </div>
 

@@ -242,6 +242,42 @@ export default function SharedMapPage() {
     }
   }, [editMode, mapData, mapaId, selectedAlunoId, supabase])
 
+  // Drag & drop: swap de alunos entre mesas
+  const handleSwapStudents = useCallback(async (fromRow: number, fromCol: number, toRow: number, toCol: number) => {
+    if (!editMode || !mapData || !mapaId) return
+
+    const newGrid: Grid = mapData.mapa.grid.map(r => r.map(c => ({ ...c })))
+    const fromCell = newGrid[fromRow]?.[fromCol]
+    const toCell = newGrid[toRow]?.[toCol]
+
+    if (!fromCell || !toCell) return
+    if (fromCell.tipo === 'bloqueado' || toCell.tipo === 'bloqueado') return
+
+    // Swap alunoIds
+    const fromAlunoId = fromCell.alunoId
+    const toAlunoId = toCell.alunoId
+    newGrid[fromRow][fromCol].alunoId = toAlunoId
+    newGrid[toRow][toCol].alunoId = fromAlunoId
+
+    // Salvar
+    const { error } = await supabase
+      .from('mapas')
+      .update({ grid: JSON.parse(JSON.stringify(newGrid)) })
+      .eq('id', mapaId)
+
+    if (error) {
+      toast.error('Erro ao salvar alteração.')
+      return
+    }
+
+    setMapData({
+      ...mapData,
+      mapa: { ...mapData.mapa, grid: newGrid, updated_at: new Date().toISOString() }
+    })
+    setSelectedAlunoId(null)
+    toast.success(toAlunoId ? 'Alunos trocados!' : 'Aluno movido!')
+  }, [editMode, mapData, mapaId, supabase])
+
   // Solicitar acesso
   async function handleRequestAccess() {
     if (!userId || !turmaId) {
@@ -462,6 +498,7 @@ export default function SharedMapPage() {
               editable={editMode}
               selectedAlunoId={selectedAlunoId}
               onCellClick={editMode ? handleCellClick : undefined}
+              onSwapStudents={editMode ? handleSwapStudents : undefined}
             />
           </div>
         </div>
