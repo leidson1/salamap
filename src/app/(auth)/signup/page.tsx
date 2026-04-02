@@ -27,6 +27,11 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  // Convite por token
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const conviteToken = searchParams?.get('convite') || null;
+  const isInvite = !!conviteToken;
+
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     if (!nome.trim()) { toast.error("Informe seu nome."); return; }
@@ -59,7 +64,7 @@ export default function SignUpPage() {
       }
 
       toast.success("Conta criada! Verifique seu email para confirmar.");
-      router.push("/login");
+      router.push(conviteToken ? `/login?redirect=/dashboard` : "/login");
     } catch {
       toast.error("Erro ao criar conta. Tente novamente.");
     } finally {
@@ -93,8 +98,15 @@ export default function SignUpPage() {
         </div>
         <CardTitle className="text-lg">Criar conta</CardTitle>
         <CardDescription className="text-xs">
-          Rápido e gratuito. Comece em menos de 1 minuto.
+          {isInvite ? 'Você foi convidado(a) para uma equipe!' : 'Rápido e gratuito. Comece em menos de 1 minuto.'}
         </CardDescription>
+        {isInvite && (
+          <div className="mt-2 rounded-md bg-emerald-50 px-3 py-2 text-center">
+            <p className="text-[11px] text-emerald-700">
+              Crie sua conta para entrar na equipe do <strong>SalaMap</strong>
+            </p>
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -164,7 +176,7 @@ export default function SignUpPage() {
 
           <Button type="submit" className="w-full h-10" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {loading ? "Criando..." : "Criar Conta"}
+            {loading ? "Criando..." : isInvite ? "Criar Conta e Entrar" : "Criar Conta"}
           </Button>
         </form>
       </CardContent>
