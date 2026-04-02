@@ -109,20 +109,24 @@ export default function SharedMapPage() {
       // Verificar permissões usando turma_id da RPC
       const rpcTurmaId = md.mapa.turma_id
       let foundAccess = false
+      let turmaOwnerId: string | null = null
 
       // 1. Dono da turma → editor
       if (rpcTurmaId) {
         try {
           const { data: turmaOwner } = await supabase
             .from('sala_turmas').select('user_id').eq('id', rpcTurmaId).maybeSingle()
-          if (turmaOwner?.user_id === user.id) {
-            setAccessLevel('editor')
-            foundAccess = true
+          if (turmaOwner) {
+            turmaOwnerId = turmaOwner.user_id as string
+            if (turmaOwner.user_id === user.id) {
+              setAccessLevel('editor')
+              foundAccess = true
+            }
           }
         } catch {}
       }
 
-      // 2. Compartilhamento direto
+      // 2. Compartilhamento direto (turma_compartilhamentos)
       if (!foundAccess && rpcTurmaId) {
         try {
           const { data: shareCheck } = await supabase
@@ -136,15 +140,27 @@ export default function SharedMapPage() {
         } catch {}
       }
 
-      // 3. Membro da mesma escola → viewer (coordenador → editor)
-      if (!foundAccess) {
+      // 3. Membro da MESMA escola que o dono da turma
+      if (!foundAccess && turmaOwnerId) {
         try {
-          const { data: myMemberships } = await supabase
-            .from('escola_membros').select('papel').eq('user_id', user.id)
-          if (myMemberships && myMemberships.length > 0) {
-            const bestRole = myMemberships.some((m: Record<string, unknown>) => m.papel === 'coordenador') ? 'editor' : 'viewer'
-            setAccessLevel(bestRole)
-            foundAccess = true
+          // Buscar escolas do dono da turma
+          const { data: ownerMemberships } = await supabase
+            .from('escola_membros').select('escola_id').eq('user_id', turmaOwnerId)
+
+          if (ownerMemberships && ownerMemberships.length > 0) {
+            const ownerEscolaIds = ownerMemberships.map((m: Record<string, unknown>) => m.escola_id)
+
+            // Verificar se EU sou membro de alguma dessas escolas
+            const { data: myMemberships } = await supabase
+              .from('escola_membros').select('escola_id, papel')
+              .eq('user_id', user.id)
+              .in('escola_id', ownerEscolaIds)
+
+            if (myMemberships && myMemberships.length > 0) {
+              const bestRole = myMemberships.some((m: Record<string, unknown>) => m.papel === 'coordenador') ? 'editor' : 'viewer'
+              setAccessLevel(bestRole)
+              foundAccess = true
+            }
           }
         } catch {}
       }
