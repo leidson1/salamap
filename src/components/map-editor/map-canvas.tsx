@@ -734,15 +734,17 @@ export function MapCanvas({
                     if (mode === 'alunos') {
                       if (aluno && cell.alunoId) {
                         if (selectedStudentId && selectedStudentId !== Number(cell.alunoId)) {
-                          // Tem outro aluno selecionado → coloca nessa mesa (handlePlace já remove da anterior)
+                          // Tem outro aluno selecionado → SWAP (troca de lugar)
                           onStudentPlace(selectedStudentId, rIdx, cIdx)
+                        } else if (selectedStudentId === Number(cell.alunoId)) {
+                          // Clicou no mesmo aluno selecionado → desseleciona
+                          onStudentRemove(rIdx, cIdx)
                         } else {
-                          // Clicou num aluno → remove e seleciona pra reposicionar
+                          // Clicou num aluno sem seleção → seleciona pra mover/trocar
                           onStudentRemove(rIdx, cIdx)
                         }
-                      } else if (selectedStudentId && cell.tipo === 'carteira') {
-                        onStudentPlace(selectedStudentId, rIdx, cIdx)
-                      } else if (!aluno && cell.tipo === 'carteira' && selectedStudentId) {
+                      } else if (selectedStudentId && (cell.tipo === 'carteira' || cell.tipo === 'vazio')) {
+                        // Mesa vazia + aluno selecionado → move pra cá
                         onStudentPlace(selectedStudentId, rIdx, cIdx)
                       }
                     } else if (mode === 'mobiliar') {

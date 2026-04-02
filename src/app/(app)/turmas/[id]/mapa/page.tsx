@@ -175,14 +175,42 @@ export default function MapaEditorPage() {
   // Canvas callbacks
   const handleStudentPlace = useCallback((alunoId: number, row: number, col: number) => {
     const newGrid = grid.map(r => r.map(c => ({ ...c })))
-    // Remove from old position
-    for (const r of newGrid) for (const c of r) if (c.alunoId === alunoId) c.alunoId = null
-    if (newGrid[row][col].tipo === 'vazio') {
+    const targetCell = newGrid[row]?.[col]
+    if (!targetCell || targetCell.tipo === 'bloqueado') return
+
+    const existingAlunoId = targetCell.alunoId ? Number(targetCell.alunoId) : null
+
+    // Encontrar posição atual do aluno que está sendo movido
+    let sourceRow = -1, sourceCol = -1
+    for (let r = 0; r < newGrid.length; r++) {
+      for (let c = 0; c < (newGrid[r]?.length ?? 0); c++) {
+        if (newGrid[r][c].alunoId === alunoId || Number(newGrid[r][c].alunoId) === alunoId) {
+          sourceRow = r
+          sourceCol = c
+          break
+        }
+      }
+      if (sourceRow >= 0) break
+    }
+
+    // SWAP: se a mesa destino já tem aluno, troca de lugar
+    if (existingAlunoId && existingAlunoId !== alunoId && sourceRow >= 0) {
+      // Coloca o aluno da mesa destino na posição de origem
+      newGrid[sourceRow][sourceCol].alunoId = existingAlunoId
+    } else if (sourceRow >= 0) {
+      // Limpa a posição de origem
+      newGrid[sourceRow][sourceCol].alunoId = null
+    }
+
+    // Coloca o aluno na mesa destino
+    if (targetCell.tipo === 'vazio') {
       newGrid[row][col].tipo = 'carteira'
       newGrid[row][col].blocoId = createSoloBlockId(row, col)
     }
     newGrid[row][col].alunoId = alunoId
-    setGrid(newGrid); triggerSave()
+
+    setGrid(newGrid)
+    triggerSave()
   }, [grid, triggerSave])
 
   const handleStudentRemove = useCallback((row: number, col: number) => {

@@ -176,21 +176,46 @@ export default function SharedMapPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // Edição: trocar aluno de mesa
+  // Edição: trocar aluno de mesa (com swap)
   const handleCellClick = useCallback(async (rIdx: number, cIdx: number) => {
     if (!editMode || !mapData || !mapaId) return
 
     const cell = mapData.mapa.grid[rIdx]?.[cIdx]
-    if (!cell || cell.tipo !== 'carteira') return
+    if (!cell || cell.tipo === 'bloqueado') return
 
     const cellAlunoId = cell.alunoId ? Number(cell.alunoId) : null
 
     if (selectedAlunoId) {
-      // Colocar aluno selecionado nessa mesa
+      if (selectedAlunoId === cellAlunoId) {
+        // Clicou no mesmo → desselecionar
+        setSelectedAlunoId(null)
+        return
+      }
+
+      // Fazer swap ou mover
       const newGrid: Grid = mapData.mapa.grid.map(r => r.map(c => ({ ...c })))
-      // Remover da posição antiga
-      for (const r of newGrid) for (const c of r) if (c.alunoId && Number(c.alunoId) === selectedAlunoId) c.alunoId = null
-      // Colocar na nova posição
+
+      // Encontrar posição atual do aluno selecionado
+      let sourceRow = -1, sourceCol = -1
+      for (let r = 0; r < newGrid.length; r++) {
+        for (let c = 0; c < (newGrid[r]?.length ?? 0); c++) {
+          if (newGrid[r][c].alunoId && Number(newGrid[r][c].alunoId) === selectedAlunoId) {
+            sourceRow = r
+            sourceCol = c
+            break
+          }
+        }
+        if (sourceRow >= 0) break
+      }
+
+      // SWAP: se destino tem aluno, coloca ele na origem
+      if (cellAlunoId && sourceRow >= 0) {
+        newGrid[sourceRow][sourceCol].alunoId = cellAlunoId
+      } else if (sourceRow >= 0) {
+        newGrid[sourceRow][sourceCol].alunoId = null
+      }
+
+      // Colocar aluno selecionado no destino
       newGrid[rIdx][cIdx].alunoId = selectedAlunoId
 
       // Salvar no banco
@@ -210,9 +235,9 @@ export default function SharedMapPage() {
         mapa: { ...mapData.mapa, grid: newGrid, updated_at: new Date().toISOString() }
       })
       setSelectedAlunoId(null)
-      toast.success('Aluno movido!')
+      toast.success(cellAlunoId ? 'Alunos trocados!' : 'Aluno movido!')
     } else if (cellAlunoId) {
-      // Selecionar aluno pra mover
+      // Selecionar aluno pra mover/trocar
       setSelectedAlunoId(cellAlunoId)
     }
   }, [editMode, mapData, mapaId, selectedAlunoId, supabase])
