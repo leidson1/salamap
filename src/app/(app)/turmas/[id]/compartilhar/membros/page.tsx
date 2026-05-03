@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
-  ArrowLeft, UserPlus, Mail, Check, Clock, Eye, Pencil, Trash2, X,
+  ArrowLeft, UserPlus, Mail, Check, Clock, Eye, Pencil, Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -78,35 +78,27 @@ export default function MembrosPage() {
 
     setSending(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Nao autenticado.')
-
-      // Verificar se o usuario convidado ja existe
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', trimmedEmail)
-        .single()
-
-      const { error } = await supabase.from('turma_compartilhamentos').insert({
-        turma_id: turmaId,
-        email: trimmedEmail,
-        papel,
-        user_id: existingProfile?.id ?? null,
-        status: existingProfile ? 'aceito' : 'pendente',
-        convidado_por: user.id,
+      const response = await fetch('/api/convidar-membro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail, papel, turmaId }),
       })
 
-      if (error) throw error
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Erro ao convidar.')
 
-      toast.success(
-        existingProfile
-          ? `${trimmedEmail} adicionado como ${papel}!`
-          : `Convite enviado para ${trimmedEmail}. Sera ativado quando se cadastrar.`
-      )
+      if (result.tipo === 'adicionado') {
+        toast.success(`${trimmedEmail} adicionado como ${papel}!`)
+      } else if (result.tipo === 'ja_membro') {
+        toast.info(`${trimmedEmail} ja faz parte deste compartilhamento.`)
+      } else {
+        toast.success(`Convite criado para ${trimmedEmail}. Compartilhe o link com o professor.`)
+      }
+
       setEmail('')
       fetchData()
-    } catch {
+    } catch (error) {
+      console.error('[SalaMap] Invite member error:', error)
       toast.error('Erro ao convidar.')
     } finally {
       setSending(false)

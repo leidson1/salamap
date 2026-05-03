@@ -39,6 +39,10 @@ export default function SignUpPage() {
 
     setLoading(true);
     try {
+      if (conviteToken && typeof window !== "undefined") {
+        localStorage.setItem("salamap_invite_token", conviteToken);
+      }
+
       const supabase = createClient();
       const { error } = await supabase.auth.signUp({
         email: email.trim(),
@@ -63,7 +67,7 @@ export default function SignUpPage() {
       }
 
       toast.success("Conta criada! Verifique seu email para confirmar.");
-      router.push(conviteToken ? `/login?redirect=/dashboard` : "/login");
+      router.push(conviteToken ? `/login?redirect=/dashboard&convite=${conviteToken}` : "/login");
     } catch {
       toast.error("Erro ao criar conta. Tente novamente.");
     } finally {
