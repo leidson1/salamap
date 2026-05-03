@@ -10,7 +10,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -169,7 +168,9 @@ export function StudentSidebar({
             <Label className="text-[11px]">Formato do nome na carteira</Label>
             <Select value={displayConfig.nameMode} onValueChange={(value) => handleNameModeChange(value as DeskNameMode)}>
               <SelectTrigger className="h-8 text-sm">
-                <SelectValue />
+                <span className="truncate">
+                  {DESK_NAME_MODE_LABELS[displayConfig.nameMode]}
+                </span>
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(DESK_NAME_MODE_LABELS).map(([value, label]) => (

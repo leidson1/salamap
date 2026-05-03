@@ -600,7 +600,7 @@ export default function SharedMapPage() {
           />
         )}
 
-        <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-xl border bg-white shadow-sm touch-pan-x">
           <div className="p-2 sm:p-3">
             <PublicGrid
               grid={mapData.mapa.grid}
@@ -615,6 +615,10 @@ export default function SharedMapPage() {
             />
           </div>
         </div>
+
+        <p className="text-[11px] text-muted-foreground sm:hidden">
+          Deslize o mapa para os lados para ver a sala inteira.
+        </p>
 
         {/* Student list */}
         {mapData.alunos && mapData.alunos.length > 0 && (
