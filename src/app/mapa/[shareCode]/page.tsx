@@ -190,7 +190,7 @@ export default function SharedMapPage() {
 
   const handleSelectAlunoFromList = useCallback((alunoId: number) => {
     setSelectedAlunoId(alunoId)
-    setPreviewAlunoId(alunoId)
+    setPreviewAlunoId(null)
     setStudentSheetOpen(false)
   }, [])
 
@@ -207,6 +207,7 @@ export default function SharedMapPage() {
       if (selectedAlunoId === cellAlunoId) {
         // Clicou no mesmo → desselecionar
         setSelectedAlunoId(null)
+        setPreviewAlunoId(null)
         return
       }
 
@@ -252,13 +253,13 @@ export default function SharedMapPage() {
         ...mapData,
         mapa: { ...mapData.mapa, grid: newGrid, updated_at: new Date().toISOString() }
       })
-      setPreviewAlunoId(selectedAlunoId)
+      setPreviewAlunoId(null)
       setSelectedAlunoId(null)
       toast.success(cellAlunoId ? 'Alunos trocados!' : 'Aluno movido!')
     } else if (cellAlunoId) {
       // Selecionar aluno pra mover/trocar
       setSelectedAlunoId(cellAlunoId)
-      setPreviewAlunoId(cellAlunoId)
+      setPreviewAlunoId(null)
     }
   }, [editMode, mapData, mapaId, selectedAlunoId, supabase])
 
@@ -294,7 +295,7 @@ export default function SharedMapPage() {
       ...mapData,
       mapa: { ...mapData.mapa, grid: newGrid, updated_at: new Date().toISOString() }
     })
-    setPreviewAlunoId(fromAlunoId ? Number(fromAlunoId) : null)
+    setPreviewAlunoId(null)
     setSelectedAlunoId(null)
     toast.success(toAlunoId ? 'Alunos trocados!' : 'Aluno movido!')
   }, [editMode, mapData, mapaId, supabase])
@@ -560,13 +561,13 @@ export default function SharedMapPage() {
 
         {/* Map grid — com clique pra edição */}
         {editMode && !selectedAluno && (
-          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-600 shadow-sm">
+          <div className="hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-600 shadow-sm sm:block">
             No celular, tocar no nome da lista costuma ser o jeito mais rÃ¡pido para escolher quem vai mudar de lugar.
           </div>
         )}
 
         {editMode && selectedAluno && (
-          <div className="rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-xs shadow-sm">
+          <div className="hidden rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-xs shadow-sm sm:block">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="font-semibold text-emerald-800">
@@ -592,7 +593,7 @@ export default function SharedMapPage() {
           </div>
         )}
 
-        {previewAluno && (
+        {!editMode && previewAluno && (
           <DeskStudentPreview
             aluno={previewAluno}
             nameMode={mapData.mapa.room_config?.deskLabels?.nameMode ?? 'apelido_ou_curto'}
@@ -611,7 +612,7 @@ export default function SharedMapPage() {
               selectedAlunoId={selectedAlunoId}
               onCellClick={editMode ? handleCellClick : undefined}
               onSwapStudents={editMode ? handleSwapStudents : undefined}
-              onDeskPreview={setPreviewAlunoId}
+              onDeskPreview={editMode ? undefined : setPreviewAlunoId}
             />
           </div>
         </div>
