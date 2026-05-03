@@ -15,10 +15,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import type { Turma, TurmaCompartilhamento } from '@/types/database'
+import type { Turma } from '@/types/database'
 
-interface MemberRow extends TurmaCompartilhamento {
-  profile?: { nome: string } | null
+interface MemberRow {
+  share_id: number
+  turma_id: number
+  turma_serie: string
+  turma_nome: string
+  turma_turno: string
+  member_user_id: string | null
+  member_nome: string
+  member_email: string
+  papel: 'editor' | 'visualizador'
+  status: 'aceito' | 'pendente'
+  created_at: string
+}
+
+interface RequestRow {
+  request_id: number
+  turma_id: number
+  turma_serie: string
+  turma_nome: string
+  turma_turno: string
+  requester_id: string
+  requester_nome: string
+  requester_email: string
+  requested_at: string
+}
+
+function formatWhen(dateStr: string) {
+  return new Date(dateStr).toLocaleString('pt-BR')
 }
 
 export default function MembrosPage() {
@@ -29,30 +55,33 @@ export default function MembrosPage() {
 
   const [turma, setTurma] = useState<Turma | null>(null)
   const [membros, setMembros] = useState<MemberRow[]>([])
+  const [solicitacoes, setSolicitacoes] = useState<RequestRow[]>([])
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [papel, setPapel] = useState<'editor' | 'visualizador'>('editor')
   const [sending, setSending] = useState(false)
+  const [actingId, setActingId] = useState<number | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
-      const { data: turmaData } = await supabase
-        .from('sala_turmas').select('*').eq('id', turmaId).single()
-      if (turmaData) setTurma(turmaData as Turma)
+      const [turmaRes, membrosRes, requestsRes] = await Promise.all([
+        supabase.from('sala_turmas').select('*').eq('id', turmaId).single(),
+        supabase.rpc('list_meus_membros_turma'),
+        supabase.rpc('list_minhas_solicitacoes_acesso'),
+      ])
 
-      const { data: membrosData } = await supabase
-        .from('turma_compartilhamentos')
-        .select('*, profile:profiles(nome)')
-        .eq('turma_id', turmaId)
-        .order('created_at', { ascending: false })
+      if (turmaRes.data) setTurma(turmaRes.data as Turma)
+      if (turmaRes.error) throw turmaRes.error
+      if (membrosRes.error) throw membrosRes.error
+      if (requestsRes.error) throw requestsRes.error
 
-      if (membrosData) {
-        setMembros(membrosData.map((m: Record<string, unknown>) => ({
-          ...m,
-          profile: Array.isArray(m.profile) ? m.profile[0] : m.profile,
-        })) as MemberRow[])
-      }
-    } catch {
+      const allMembers = (membrosRes.data as MemberRow[] | null) ?? []
+      const allRequests = (requestsRes.data as RequestRow[] | null) ?? []
+
+      setMembros(allMembers.filter((member) => member.turma_id === turmaId))
+      setSolicitacoes(allRequests.filter((request) => request.turma_id === turmaId))
+    } catch (error) {
+      console.error('[SalaMap] Members page load error:', error)
       toast.error('Erro ao carregar dados.')
     } finally {
       setLoading(false)
@@ -70,8 +99,7 @@ export default function MembrosPage() {
       return
     }
 
-    // Verificar se já convidou
-    if (membros.some((m) => m.email === trimmedEmail)) {
+    if (membros.some((member) => member.member_email.trim().toLowerCase() === trimmedEmail)) {
       toast.error('Este email ja foi convidado.')
       return
     }
@@ -105,21 +133,72 @@ export default function MembrosPage() {
     }
   }
 
-  async function handleRemove(id: number) {
+  const handleApprove = useCallback(async (requestId: number) => {
+    setActingId(requestId)
+    try {
+      const { error } = await supabase.rpc('approve_turma_access_request', {
+        p_request_id: requestId,
+      })
+
+      if (error) throw error
+
+      toast.success('Acesso aprovado e membro adicionado.')
+      await fetchData()
+    } catch (error) {
+      console.error('[SalaMap] Approve request error:', error)
+      toast.error('Nao foi possivel aprovar esta solicitacao.')
+    } finally {
+      setActingId(null)
+    }
+  }, [fetchData, supabase])
+
+  const handleReject = useCallback(async (requestId: number) => {
+    setActingId(requestId)
+    try {
+      const { data, error } = await supabase.rpc('reject_turma_access_request', {
+        p_request_id: requestId,
+      })
+
+      if (error) throw error
+      if (!data) {
+        toast.error('Solicitacao nao encontrada.')
+        return
+      }
+
+      toast.success('Solicitacao recusada.')
+      await fetchData()
+    } catch (error) {
+      console.error('[SalaMap] Reject request error:', error)
+      toast.error('Nao foi possivel recusar esta solicitacao.')
+    } finally {
+      setActingId(null)
+    }
+  }, [fetchData, supabase])
+
+  async function handleRemove(shareId: number) {
     if (!window.confirm('Remover este membro?')) return
 
+    setActingId(shareId)
     try {
       const { error } = await supabase
         .from('turma_compartilhamentos')
         .delete()
-        .eq('id', id)
+        .eq('id', shareId)
+
       if (error) throw error
+
       toast.success('Membro removido.')
       fetchData()
-    } catch {
+    } catch (error) {
+      console.error('[SalaMap] Remove member error:', error)
       toast.error('Erro ao remover.')
+    } finally {
+      setActingId(null)
     }
   }
+
+  const activeMembers = membros.filter((member) => member.status === 'aceito')
+  const pendingInvites = membros.filter((member) => member.status === 'pendente')
 
   if (loading) {
     return (
@@ -134,21 +213,21 @@ export default function MembrosPage() {
     <div className="space-y-6">
       <div>
         <Button
-          variant="ghost" size="sm"
+          variant="ghost"
+          size="sm"
           onClick={() => router.push(`/turmas/${turmaId}/compartilhar`)}
-          className="-ml-2 text-muted-foreground mb-1"
+          className="-ml-2 mb-1 text-muted-foreground"
         >
-          <ArrowLeft className="size-4 mr-1" /> Voltar
+          <ArrowLeft className="mr-1 size-4" /> Voltar
         </Button>
         <h1 className="text-xl font-semibold tracking-tight">
-          Membros - {turma?.serie} {turma?.turma}
+          Acessos - {turma?.serie} {turma?.turma}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Convide professores para ver ou editar esta turma
+          Aprove solicitacoes e gerencie quem pode ver ou editar esta turma.
         </p>
       </div>
 
-      {/* Convidar */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -160,7 +239,7 @@ export default function MembrosPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex-1 space-y-1">
               <Label htmlFor="invite-email" className="text-xs">Email</Label>
               <Input
@@ -172,9 +251,9 @@ export default function MembrosPage() {
                 onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
               />
             </div>
-            <div className="w-full sm:w-36 space-y-1">
+            <div className="w-full space-y-1 sm:w-36">
               <Label className="text-xs">Permissao</Label>
-              <Select value={papel} onValueChange={(v) => setPapel(v as 'editor' | 'visualizador')}>
+              <Select value={papel} onValueChange={(value) => setPapel(value as 'editor' | 'visualizador')}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -186,7 +265,7 @@ export default function MembrosPage() {
             </div>
             <div className="flex items-end">
               <Button onClick={handleInvite} disabled={sending}>
-                <Mail className="size-4 mr-1" />
+                <Mail className="mr-1 size-4" />
                 {sending ? 'Enviando...' : 'Convidar'}
               </Button>
             </div>
@@ -194,59 +273,124 @@ export default function MembrosPage() {
         </CardContent>
       </Card>
 
-      {/* Lista de membros */}
-      <Card>
+      <Card className="border-orange-200/60">
         <CardHeader>
-          <CardTitle>
-            Membros ({membros.length})
-          </CardTitle>
+          <CardTitle>Solicitacoes pendentes ({solicitacoes.length})</CardTitle>
+          <CardDescription>
+            Pedidos feitos por professores a partir do link compartilhado da turma.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {membros.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              Nenhum membro convidado ainda.
+          {solicitacoes.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Nenhuma solicitacao pendente para esta turma.
             </p>
           ) : (
             <div className="space-y-2">
-              {membros.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between rounded-lg border px-3 py-2.5"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                      <Mail className="size-3.5 text-emerald-600" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {m.profile?.nome || m.email}
-                      </p>
-                      {m.profile?.nome && (
-                        <p className="text-xs text-muted-foreground truncate">{m.email}</p>
-                      )}
-                    </div>
+              {solicitacoes.map((request) => (
+                <div key={request.request_id} className="flex flex-col gap-3 rounded-lg border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{request.requester_nome}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {request.requester_email || 'Email nao informado'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Pedido em {formatWhen(request.requested_at)}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant={m.papel === 'editor' ? 'default' : 'outline'} className="text-[10px]">
-                      {m.papel === 'editor' ? (
-                        <><Pencil className="size-2.5 mr-0.5" /> Editor</>
-                      ) : (
-                        <><Eye className="size-2.5 mr-0.5" /> Visualizador</>
-                      )}
-                    </Badge>
-                    <Badge
-                      variant={m.status === 'aceito' ? 'secondary' : 'outline'}
-                      className="text-[10px]"
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700"
+                      onClick={() => handleApprove(request.request_id)}
+                      disabled={actingId === request.request_id}
                     >
-                      {m.status === 'aceito' ? (
-                        <><Check className="size-2.5 mr-0.5" /> Ativo</>
+                      <Check className="mr-1 size-3" /> Aceitar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => handleReject(request.request_id)}
+                      disabled={actingId === request.request_id}
+                    >
+                      Recusar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Membros ativos ({activeMembers.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {activeMembers.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhum membro ativo nesta turma.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {activeMembers.map((member) => (
+                <div key={member.share_id} className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{member.member_nome}</p>
+                    <p className="truncate text-xs text-muted-foreground">{member.member_email || 'Email nao informado'}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={member.papel === 'editor' ? 'default' : 'outline'} className="text-[10px]">
+                      {member.papel === 'editor' ? (
+                        <><Pencil className="mr-0.5 size-2.5" /> Editor</>
                       ) : (
-                        <><Clock className="size-2.5 mr-0.5" /> Pendente</>
+                        <><Eye className="mr-0.5 size-2.5" /> Visualizador</>
                       )}
                     </Badge>
                     <Button
-                      variant="ghost" size="icon-sm"
-                      onClick={() => handleRemove(m.id)}
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleRemove(member.share_id)}
+                      disabled={actingId === member.share_id}
+                    >
+                      <Trash2 className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Convites pendentes ({pendingInvites.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {pendingInvites.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhum convite pendente nesta turma.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {pendingInvites.map((invite) => (
+                <div key={invite.share_id} className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{invite.member_nome}</p>
+                    <p className="truncate text-xs text-muted-foreground">{invite.member_email || 'Email nao informado'}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px]">
+                      <Clock className="mr-0.5 size-2.5" /> Pendente
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleRemove(invite.share_id)}
+                      disabled={actingId === invite.share_id}
                     >
                       <Trash2 className="size-3.5 text-muted-foreground" />
                     </Button>

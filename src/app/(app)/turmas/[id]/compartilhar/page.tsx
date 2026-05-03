@@ -342,7 +342,7 @@ export default function CompartilharPage() {
               </div>
               <Button variant="outline" render={<Link href={`/turmas/${turmaId}/compartilhar/membros`} />}>
                 <Users className="size-4 mr-1" />
-                Gerenciar Membros
+                Gerenciar Acessos
               </Button>
             </div>
           </CardHeader>

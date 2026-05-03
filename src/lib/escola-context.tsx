@@ -128,7 +128,11 @@ export function EscolaProvider({ children, userId }: { children: React.ReactNode
   }, [memberships])
 
   useEffect(() => {
-    refreshEscola()
+    const timer = window.setTimeout(() => {
+      void refreshEscola()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [refreshEscola])
 
   if (!loaded) {

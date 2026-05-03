@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import Link from 'next/link'
 import {
-  Building2, Users, Copy, UserPlus, LayoutGrid,
+  Building2, Copy, UserPlus, LayoutGrid,
   Clock, Crown, GraduationCap, Upload, ImageIcon,
   ArrowRight, Check,
 } from 'lucide-react'
@@ -32,20 +32,22 @@ interface EscolaListItem {
 
 export default function EscolaPage() {
   const supabase = createClient()
-  const { escola: currentEscola, refreshEscola } = useEscola()
+  const { escola: currentEscola, refreshEscola, switchEscola } = useEscola()
   const [escolaDetails, setEscolaDetails] = useState<EscolaWithMembers | null>(null)
   const [allEscolas, setAllEscolas] = useState<EscolaListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [codigoConvite, setCodigoConvite] = useState('')
   const [joining, setJoining] = useState(false)
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
 
   const [allTurmas, setAllTurmas] = useState<Array<{
-    id: number; serie: string; turma: string; turno: string
-    updated_at?: string; owner: { nome: string }; alunos_count: number
-  }>>([])
-  const [pendingRequests, setPendingRequests] = useState<Array<{
-    id: number; turma_id: number; user_id: string
-    turma_nome: string; user_nome: string; user_email: string; created_at: string
+    id: number
+    serie: string
+    turma: string
+    turno: string
+    updated_at?: string
+    owner: { nome: string }
+    alunos_count: number
   }>>([])
 
   const fetchData = useCallback(async () => {
@@ -53,31 +55,40 @@ export default function EscolaPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Buscar TODAS as escolas que participo
       const escolas: EscolaListItem[] = []
 
-      // Escolas que criei
-      const { data: myEscolas } = await supabase.from('escolas').select('id, nome, logo_url').eq('criado_por', user.id)
+      const { data: myEscolas } = await supabase
+        .from('escolas')
+        .select('id, nome, logo_url')
+        .eq('criado_por', user.id)
+
       if (myEscolas) {
-        for (const e of myEscolas) {
-          escolas.push({ id: e.id, nome: e.nome, logo_url: e.logo_url, role: 'coordenador', isCurrent: currentEscola?.id === e.id })
+        for (const escola of myEscolas) {
+          escolas.push({
+            id: escola.id,
+            nome: escola.nome,
+            logo_url: escola.logo_url,
+            role: 'coordenador',
+            isCurrent: currentEscola?.id === escola.id,
+          })
         }
       }
 
-      // Escolas onde sou membro
       const { data: memberships } = await supabase
         .from('escola_membros')
         .select('papel, escola:escolas(id, nome, logo_url)')
         .eq('user_id', user.id)
 
       if (memberships) {
-        for (const m of memberships) {
-          const e = Array.isArray(m.escola) ? m.escola[0] : m.escola
-          if (e && !escolas.some(x => x.id === (e as Escola).id)) {
+        for (const membership of memberships) {
+          const escola = Array.isArray(membership.escola) ? membership.escola[0] : membership.escola
+          if (escola && !escolas.some((item) => item.id === (escola as Escola).id)) {
             escolas.push({
-              id: (e as Escola).id, nome: (e as Escola).nome,
-              logo_url: (e as Escola).logo_url, role: m.papel as string,
-              isCurrent: currentEscola?.id === (e as Escola).id
+              id: (escola as Escola).id,
+              nome: (escola as Escola).nome,
+              logo_url: (escola as Escola).logo_url,
+              role: membership.papel as string,
+              isCurrent: currentEscola?.id === (escola as Escola).id,
             })
           }
         }
@@ -85,7 +96,6 @@ export default function EscolaPage() {
 
       setAllEscolas(escolas)
 
-      // Detalhes da escola atual
       if (currentEscola) {
         const { data: membros } = await supabase
           .from('escola_membros')
@@ -93,19 +103,20 @@ export default function EscolaPage() {
           .eq('escola_id', currentEscola.id)
 
         const isCreator = currentEscola.criado_por === user.id
-        const myMembership = (membros || []).find((m: Record<string, unknown>) => m.user_id === user.id)
+        const myMembership = (membros || []).find((member: Record<string, unknown>) => member.user_id === user.id)
 
         setEscolaDetails({
           ...currentEscola,
-          membros: (membros || []).map((m: Record<string, unknown>) => ({
-            ...m,
-            profile: Array.isArray(m.profile) ? m.profile[0] : m.profile,
+          membros: (membros || []).map((member: Record<string, unknown>) => ({
+            ...member,
+            profile: Array.isArray(member.profile) ? member.profile[0] : member.profile,
           })),
-          myRole: isCreator ? 'coordenador' : ((myMembership as Record<string, unknown>)?.papel as string || 'professor') as 'coordenador' | 'professor',
+          myRole: isCreator
+            ? 'coordenador'
+            : (((myMembership as Record<string, unknown>)?.papel as string) || 'professor') as 'coordenador' | 'professor',
         } as EscolaWithMembers)
 
-        // Turmas da escola
-        const memberIds = (membros || []).map((m: Record<string, unknown>) => m.user_id).filter(Boolean)
+        const memberIds = (membros || []).map((member: Record<string, unknown>) => member.user_id).filter(Boolean)
         const allUserIds = [...new Set([user.id, ...memberIds])]
 
         const { data: turmasData } = await supabase
@@ -116,36 +127,37 @@ export default function EscolaPage() {
           .order('serie')
 
         if (turmasData) {
-          const { data: profiles } = await supabase.from('profiles').select('id, nome').in('id', allUserIds)
-          const profileMap = new Map((profiles || []).map((p: Record<string, unknown>) => [p.id, p.nome]))
-          setAllTurmas(turmasData.map((t: Record<string, unknown>) => ({
-            id: t.id as number, serie: t.serie as string, turma: t.turma as string, turno: t.turno as string,
-            owner: { nome: (profileMap.get(t.user_id) || 'Desconhecido') as string },
-            alunos_count: (Array.isArray(t.sala_alunos) && t.sala_alunos[0]?.count) || 0,
-            updated_at: Array.isArray(t.mapas) && t.mapas[0] ? (t.mapas[0] as Record<string, unknown>).updated_at as string : undefined,
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, nome')
+            .in('id', allUserIds)
+
+          const profileMap = new Map((profiles || []).map((profile: Record<string, unknown>) => [profile.id, profile.nome]))
+
+          setAllTurmas(turmasData.map((turma: Record<string, unknown>) => ({
+            id: turma.id as number,
+            serie: turma.serie as string,
+            turma: turma.turma as string,
+            turno: turma.turno as string,
+            owner: { nome: (profileMap.get(turma.user_id) || 'Desconhecido') as string },
+            alunos_count: (Array.isArray(turma.sala_alunos) && turma.sala_alunos[0]?.count) || 0,
+            updated_at: Array.isArray(turma.mapas) && turma.mapas[0]
+              ? (turma.mapas[0] as Record<string, unknown>).updated_at as string
+              : undefined,
           })))
         }
       }
-      // Buscar solicitações de acesso pendentes (das minhas turmas)
-      const { data: requests } = await supabase
-        .from('solicitacoes_acesso')
-        .select('id, turma_id, user_id, created_at, turma:sala_turmas(serie, turma), profile:profiles(nome, email)')
-        .eq('status', 'pendente')
 
-      if (requests && Array.isArray(requests)) {
-        setPendingRequests(requests.map((r: Record<string, unknown>) => {
-          const turma = Array.isArray(r.turma) ? r.turma[0] : r.turma
-          const profile = Array.isArray(r.profile) ? r.profile[0] : r.profile
-          return {
-            id: r.id as number,
-            turma_id: r.turma_id as number,
-            user_id: r.user_id as string,
-            turma_nome: turma ? `${(turma as Record<string, string>).serie} ${(turma as Record<string, string>).turma}` : 'Turma',
-            user_nome: (profile as Record<string, string>)?.nome || 'Usuário',
-            user_email: (profile as Record<string, string>)?.email || '',
-            created_at: r.created_at as string,
-          }
-        }))
+      const { data: requestsData, error: requestsError } = await supabase.rpc('list_minhas_solicitacoes_acesso')
+      if (!requestsError && Array.isArray(requestsData)) {
+        setPendingRequestsCount(requestsData.length)
+      } else {
+        const { data: rawRequests } = await supabase
+          .from('solicitacoes_acesso')
+          .select('id')
+          .eq('status', 'pendente')
+
+        setPendingRequestsCount(rawRequests?.length ?? 0)
       }
     } catch (err) {
       console.error('[SalaMap] Escola page error:', err)
@@ -154,27 +166,39 @@ export default function EscolaPage() {
     }
   }, [supabase, currentEscola])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   async function handleJoinWithCode() {
-    if (!codigoConvite.trim()) { toast.error('Digite o código.'); return }
+    if (!codigoConvite.trim()) {
+      toast.error('Digite o codigo.')
+      return
+    }
+
     setJoining(true)
     try {
       const { data, error } = await supabase.rpc('entrar_escola', { p_codigo: codigoConvite.trim() })
       if (error) throw error
-      if (!data) { toast.error('Código inválido.'); setJoining(false); return }
-      toast.success('Você entrou na equipe!')
+      if (!data) {
+        toast.error('Codigo invalido.')
+        setJoining(false)
+        return
+      }
+
+      toast.success('Voce entrou na equipe!')
       setCodigoConvite('')
       await refreshEscola()
       fetchData()
-    } catch { toast.error('Erro ao entrar.') }
-    finally { setJoining(false) }
+    } catch {
+      toast.error('Erro ao entrar.')
+    } finally {
+      setJoining(false)
+    }
   }
 
   async function handleSwitchEscola(escolaId: number) {
-    // Para trocar a escola ativa, precisamos atualizar o contexto
-    // O contexto busca a primeira escola (criador ou membro)
-    // Por enquanto, recarregar a pagina funciona
+    switchEscola(escolaId)
     await refreshEscola()
     window.location.reload()
   }
@@ -182,6 +206,7 @@ export default function EscolaPage() {
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file || !currentEscola) return
+
     try {
       const ext = file.name.split('.').pop()
       const path = `${currentEscola.id}/logo.${ext}`
@@ -191,11 +216,14 @@ export default function EscolaPage() {
       await refreshEscola()
       fetchData()
       toast.success('Logo atualizado!')
-    } catch { toast.error('Erro ao enviar logo.') }
+    } catch {
+      toast.error('Erro ao enviar logo.')
+    }
   }
 
   async function handleNomeUpdate(novoNome: string) {
     if (!currentEscola || !novoNome.trim()) return
+
     await supabase.from('escolas').update({ nome: novoNome.trim() }).eq('id', currentEscola.id)
     await refreshEscola()
     fetchData()
@@ -205,42 +233,7 @@ export default function EscolaPage() {
   function handleCopyCode() {
     if (currentEscola?.codigo_convite) {
       navigator.clipboard.writeText(currentEscola.codigo_convite)
-      toast.success('Código copiado!')
-    }
-  }
-
-  async function handleAcceptRequest(requestId: number, turmaId: number, requestUserId: string) {
-    try {
-      // Criar compartilhamento como editor
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      await supabase.from('turma_compartilhamentos').insert({
-        turma_id: turmaId,
-        user_id: requestUserId,
-        email: '', // será preenchido
-        papel: 'editor',
-        status: 'aceito',
-        convidado_por: user.id,
-      })
-
-      // Atualizar solicitação
-      await supabase.from('solicitacoes_acesso').update({ status: 'aceito' }).eq('id', requestId)
-
-      setPendingRequests(prev => prev.filter(r => r.id !== requestId))
-      toast.success('Acesso aprovado!')
-    } catch {
-      toast.error('Erro ao aprovar acesso.')
-    }
-  }
-
-  async function handleRejectRequest(requestId: number) {
-    try {
-      await supabase.from('solicitacoes_acesso').update({ status: 'recusado' }).eq('id', requestId)
-      setPendingRequests(prev => prev.filter(r => r.id !== requestId))
-      toast.success('Solicitação recusada.')
-    } catch {
-      toast.error('Erro ao recusar.')
+      toast.success('Codigo copiado!')
     }
   }
 
@@ -256,13 +249,12 @@ export default function EscolaPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Configuracoes</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Gerencie sua escola, equipe e convites
         </p>
       </div>
 
-      {/* Entrar em outra equipe — sempre visivel */}
       <Card className="border-amber-200/50">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
@@ -270,7 +262,7 @@ export default function EscolaPage() {
             <CardTitle className="text-sm">Entrar em outra equipe</CardTitle>
           </div>
           <CardDescription className="text-xs">
-            Recebeu um código de convite? Cole aqui para participar de outra escola.
+            Recebeu um codigo de convite? Cole aqui para participar de outra escola.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -278,7 +270,7 @@ export default function EscolaPage() {
             <Input
               value={codigoConvite}
               onChange={(e) => setCodigoConvite(e.target.value)}
-              placeholder="Código de convite"
+              placeholder="Codigo de convite"
               className="h-9 text-sm"
               onKeyDown={(e) => e.key === 'Enter' && handleJoinWithCode()}
             />
@@ -289,55 +281,29 @@ export default function EscolaPage() {
         </CardContent>
       </Card>
 
-      {/* Solicitações de acesso pendentes */}
-      {pendingRequests.length > 0 && (
-        <Card className="border-orange-200/50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <UserPlus className="size-4 text-orange-600" />
-              <CardTitle className="text-sm">
-                Solicitações de Acesso ({pendingRequests.length})
-              </CardTitle>
-            </div>
-            <CardDescription className="text-xs">
-              Professores solicitando acesso às suas turmas
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {pendingRequests.map((r) => (
-                <div key={r.id} className="flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50/30 px-3 py-2.5">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{r.user_nome}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {r.user_email} · Turma: {r.turma_nome}
-                    </p>
-                  </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <Button
-                      size="sm"
-                      className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700"
-                      onClick={() => handleAcceptRequest(r.id, r.turma_id, r.user_id)}
-                    >
-                      <Check className="size-3 mr-0.5" /> Aceitar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => handleRejectRequest(r.id)}
-                    >
-                      Recusar
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <Card className="border-blue-200/60">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <UserPlus className="size-4 text-blue-600" />
+            <CardTitle className="text-sm">Gestao de acessos</CardTitle>
+          </div>
+          <CardDescription className="text-xs">
+            Aprove ou recuse solicitacoes e acompanhe membros das turmas em uma central unica.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium">{pendingRequestsCount} solicitacao(oes) pendente(s)</p>
+            <p className="text-xs text-muted-foreground">
+              Abra a central para ver membros ativos, convites pendentes e pedidos de acesso.
+            </p>
+          </div>
+          <Button render={<Link href="/acessos" />}>
+            Abrir central <ArrowRight className="ml-1 size-4" />
+          </Button>
+        </CardContent>
+      </Card>
 
-      {/* Minhas equipes */}
       {allEscolas.length > 1 && (
         <Card>
           <CardHeader className="pb-3">
@@ -346,40 +312,41 @@ export default function EscolaPage() {
               <CardTitle className="text-sm">Minhas Equipes ({allEscolas.length})</CardTitle>
             </div>
             <CardDescription className="text-xs">
-              Você participa de {allEscolas.length} equipe{allEscolas.length > 1 ? 's' : ''}.
+              Voce participa de {allEscolas.length} equipe{allEscolas.length > 1 ? 's' : ''}.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {allEscolas.map((e) => (
-                <div key={e.id}
+              {allEscolas.map((escola) => (
+                <div
+                  key={escola.id}
                   className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
-                    e.isCurrent ? 'border-emerald-300 bg-emerald-50/50' : 'hover:bg-muted/30'
+                    escola.isCurrent ? 'border-emerald-300 bg-emerald-50/50' : 'hover:bg-muted/30'
                   }`}
                 >
-                  {e.logo_url ? (
-                    <img src={e.logo_url} alt="" className="h-9 w-9 rounded-lg object-cover border" />
+                  {escola.logo_url ? (
+                    <img src={escola.logo_url} alt="" className="h-9 w-9 rounded-lg border object-cover" />
                   ) : (
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                       <Building2 className="size-4 text-muted-foreground" />
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{e.nome}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{escola.nome}</p>
                     <Badge variant="outline" className="text-[10px]">
-                      {e.role === 'coordenador' ? (
-                        <><Crown className="size-2.5 mr-0.5" /> Coordenador</>
+                      {escola.role === 'coordenador' ? (
+                        <><Crown className="mr-0.5 size-2.5" /> Coordenador</>
                       ) : (
-                        <><GraduationCap className="size-2.5 mr-0.5" /> Professor</>
+                        <><GraduationCap className="mr-0.5 size-2.5" /> Professor</>
                       )}
                     </Badge>
                   </div>
-                  {e.isCurrent ? (
-                    <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">
-                      <Check className="size-2.5 mr-0.5" /> Ativa
+                  {escola.isCurrent ? (
+                    <Badge className="bg-emerald-100 text-[10px] text-emerald-700">
+                      <Check className="mr-0.5 size-2.5" /> Ativa
                     </Badge>
                   ) : (
-                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleSwitchEscola(e.id)}>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleSwitchEscola(escola.id)}>
                       Alternar
                     </Button>
                   )}
@@ -390,18 +357,19 @@ export default function EscolaPage() {
         </Card>
       )}
 
-      {/* Configurações da escola atual */}
       {currentEscola && escolaDetails && (
         <>
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Perfil da Escola</CardTitle>
-              <CardDescription className="text-xs">Nome e logo que aparecem nos PDFs e QR Codes</CardDescription>
+              <CardDescription className="text-xs">
+                Nome e logo que aparecem nos PDFs e QR Codes
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4">
                 {currentEscola.logo_url ? (
-                  <img src={currentEscola.logo_url} alt="" className="h-16 w-16 rounded-xl object-cover border" />
+                  <img src={currentEscola.logo_url} alt="" className="h-16 w-16 rounded-xl border object-cover" />
                 ) : (
                   <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted">
                     <ImageIcon className="size-6 text-muted-foreground" />
@@ -409,28 +377,34 @@ export default function EscolaPage() {
                 )}
                 <label className="cursor-pointer">
                   <Button variant="outline" size="sm" className="pointer-events-none">
-                    <Upload className="size-3 mr-1" />
+                    <Upload className="mr-1 size-3" />
                     {currentEscola.logo_url ? 'Trocar Logo' : 'Enviar Logo'}
                   </Button>
                   <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
                 </label>
               </div>
+
               <div className="space-y-1.5">
                 <Label className="text-xs">Nome</Label>
                 <Input
                   defaultValue={currentEscola.nome}
-                  onBlur={(e) => { if (e.target.value !== currentEscola.nome) handleNomeUpdate(e.target.value) }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                  onBlur={(e) => {
+                    if (e.target.value !== currentEscola.nome) handleNomeUpdate(e.target.value)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.currentTarget.blur()
+                  }}
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Código de convite */}
           <Card className="border-emerald-200/70">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Código de Convite</CardTitle>
-              <CardDescription className="text-xs">Compartilhe com professores para entrarem na sua equipe</CardDescription>
+              <CardTitle className="text-sm">Codigo de Convite</CardTitle>
+              <CardDescription className="text-xs">
+                Compartilhe com professores para entrarem na sua equipe
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
@@ -438,35 +412,34 @@ export default function EscolaPage() {
                   {currentEscola.codigo_convite}
                 </code>
                 <Button variant="outline" size="sm" onClick={handleCopyCode}>
-                  <Copy className="size-3.5 mr-1" /> Copiar
+                  <Copy className="mr-1 size-3.5" /> Copiar
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Membros */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Membros ({escolaDetails.membros.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {escolaDetails.membros.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                {escolaDetails.membros.map((membro) => (
+                  <div key={membro.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
                         <GraduationCap className="size-3.5 text-emerald-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">{m.profile?.nome}</p>
-                        <p className="text-xs text-muted-foreground">{m.profile?.email}</p>
+                        <p className="text-sm font-medium">{membro.profile?.nome}</p>
+                        <p className="text-xs text-muted-foreground">{membro.profile?.email}</p>
                       </div>
                     </div>
-                    <Badge variant={m.papel === 'coordenador' ? 'default' : 'outline'} className="text-[10px]">
-                      {m.papel === 'coordenador' ? (
-                        <><Crown className="size-2.5 mr-0.5" /> Coordenador</>
+                    <Badge variant={membro.papel === 'coordenador' ? 'default' : 'outline'} className="text-[10px]">
+                      {membro.papel === 'coordenador' ? (
+                        <><Crown className="mr-0.5 size-2.5" /> Coordenador</>
                       ) : (
-                        <><GraduationCap className="size-2.5 mr-0.5" /> Professor</>
+                        <><GraduationCap className="mr-0.5 size-2.5" /> Professor</>
                       )}
                     </Badge>
                   </div>
@@ -475,7 +448,6 @@ export default function EscolaPage() {
             </CardContent>
           </Card>
 
-          {/* Turmas da escola */}
           {allTurmas.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
@@ -483,22 +455,25 @@ export default function EscolaPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {allTurmas.map((t) => (
-                    <Link key={t.id} href={`/turmas/${t.id}/mapa`}
-                      className="flex items-center justify-between rounded-lg border px-3 py-2 hover:bg-muted/30 transition-colors">
+                  {allTurmas.map((turma) => (
+                    <Link
+                      key={turma.id}
+                      href={`/turmas/${turma.id}/mapa`}
+                      className="flex items-center justify-between rounded-lg border px-3 py-2 transition-colors hover:bg-muted/30"
+                    >
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
                           <LayoutGrid className="size-3.5 text-blue-600" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium">{t.serie} {t.turma}</p>
-                          <p className="text-xs text-muted-foreground">{t.owner.nome} · {t.turno}</p>
+                          <p className="text-sm font-medium">{turma.serie} {turma.turma}</p>
+                          <p className="text-xs text-muted-foreground">{turma.owner.nome} · {turma.turno}</p>
                         </div>
                       </div>
-                      {t.updated_at && (
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                      {turma.updated_at && (
+                        <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
                           <Clock className="size-2.5" />
-                          {new Date(t.updated_at).toLocaleDateString('pt-BR')}
+                          {new Date(turma.updated_at).toLocaleDateString('pt-BR')}
                         </span>
                       )}
                     </Link>

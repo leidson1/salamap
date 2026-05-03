@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Home, Users, LogOut, LayoutGrid, Settings,
-  ChevronDown, Check, Crown, GraduationCap,
+  ChevronDown, Check, UserPlus,
 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
@@ -38,15 +38,15 @@ export function SidebarContent({ user, currentPath }: SidebarProps) {
   }
 
   const navItems = [
-    { href: '/dashboard', label: 'Início', icon: Home },
+    { href: '/dashboard', label: 'Inicio', icon: Home },
     { href: '/turmas', label: 'Minhas Turmas', icon: Users },
-    { href: '/escola', label: 'Configurações', icon: Settings },
+    { href: '/acessos', label: 'Acessos', icon: UserPlus },
+    { href: '/escola', label: 'Configuracoes', icon: Settings },
   ]
 
   return (
     <div className="flex h-full flex-col bg-gradient-to-b from-emerald-950 via-emerald-900 to-emerald-800">
-      {/* Workspace Switcher */}
-      <div className="px-3 pt-4 pb-2">
+      <div className="px-3 pb-2 pt-4">
         <button
           onClick={() => setSwitcherOpen(!switcherOpen)}
           className="flex w-full items-center gap-2.5 rounded-lg bg-white/10 px-3 py-2.5 text-left transition-colors hover:bg-white/15"
@@ -58,56 +58,58 @@ export function SidebarContent({ user, currentPath }: SidebarProps) {
               <LayoutGrid className="h-4 w-4 text-white" />
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">
               {escola?.nome || 'SalaMap'}
             </p>
             {papel && (
-              <p className="text-[10px] text-emerald-300 truncate">
+              <p className="truncate text-[10px] text-emerald-300">
                 {papel === 'coordenador' ? 'Coordenador' : 'Professor'}
               </p>
             )}
           </div>
-          <ChevronDown className={cn(
-            'size-4 text-emerald-300 transition-transform',
-            switcherOpen && 'rotate-180'
-          )} />
+          <ChevronDown
+            className={cn(
+              'size-4 text-emerald-300 transition-transform',
+              switcherOpen && 'rotate-180'
+            )}
+          />
         </button>
 
-        {/* Dropdown de escolas */}
         {switcherOpen && memberships.length > 1 && (
-          <div className="mt-1 rounded-lg bg-white/10 p-1.5 space-y-0.5">
-            {memberships.map((m) => {
-              const isActive = escola?.id === m.escola.id
+          <div className="mt-1 space-y-0.5 rounded-lg bg-white/10 p-1.5">
+            {memberships.map((membership) => {
+              const active = escola?.id === membership.escola.id
+
               return (
                 <button
-                  key={m.escola.id}
+                  key={membership.escola.id}
                   onClick={() => {
-                    switchEscola(m.escola.id)
+                    switchEscola(membership.escola.id)
                     setSwitcherOpen(false)
                   }}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors',
-                    isActive
+                    active
                       ? 'bg-white/15 text-white'
                       : 'text-emerald-200 hover:bg-white/10 hover:text-white'
                   )}
                 >
-                  {m.escola.logo_url ? (
-                    <img src={m.escola.logo_url} alt="" className="h-6 w-6 rounded object-cover" />
+                  {membership.escola.logo_url ? (
+                    <img src={membership.escola.logo_url} alt="" className="h-6 w-6 rounded object-cover" />
                   ) : (
                     <div className="flex h-6 w-6 items-center justify-center rounded bg-white/10">
                       <LayoutGrid className="size-3 text-white/70" />
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{m.escola.nome}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium">{membership.escola.nome}</p>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Badge variant="outline" className="text-[8px] border-white/20 text-emerald-300 px-1 py-0">
-                      {m.papel === 'coordenador' ? 'Coord.' : 'Prof.'}
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Badge variant="outline" className="border-white/20 px-1 py-0 text-[8px] text-emerald-300">
+                      {membership.papel === 'coordenador' ? 'Coord.' : 'Prof.'}
                     </Badge>
-                    {isActive && <Check className="size-3 text-emerald-400" />}
+                    {active && <Check className="size-3 text-emerald-400" />}
                   </div>
                 </button>
               )
@@ -116,11 +118,11 @@ export function SidebarContent({ user, currentPath }: SidebarProps) {
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 mt-1">
+      <nav className="mt-1 flex-1 space-y-1 px-3">
         {navItems.map((item) => {
           const Icon = item.icon
           const active = isActive(item.href)
+
           return (
             <Link
               key={item.href}
@@ -140,12 +142,9 @@ export function SidebarContent({ user, currentPath }: SidebarProps) {
         <Separator className="!my-3 bg-white/10" />
       </nav>
 
-      {/* User info + Logout */}
       <div className="border-t border-white/10 p-4">
         <div className="mb-3">
-          <p className="truncate text-sm font-medium text-white">
-            {user.nome}
-          </p>
+          <p className="truncate text-sm font-medium text-white">{user.nome}</p>
           <p className="truncate text-xs text-emerald-300">{user.email}</p>
         </div>
         <button
