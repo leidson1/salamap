@@ -31,6 +31,7 @@ interface MapCanvasWrapperProps {
   onFurnitureBlockSelect?: (blockId: string | null) => void
   onRoomConfigChange?: (config: RoomConfig) => void
   onRoomElementSelect?: (elementId: string | null) => void
+  onDeskPreview?: (alunoId: number | null) => void
 }
 
 export function MapCanvasWrapper(props: MapCanvasWrapperProps) {

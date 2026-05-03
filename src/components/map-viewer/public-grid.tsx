@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { getCellBlockId, displayName } from '@/lib/map/utils'
+import { normalizeRoomConfig } from '@/lib/map/room-config'
 import { Ban } from 'lucide-react'
 import { ClassroomFrame } from '@/components/map-editor/classroom-frame'
 import type { Grid, RoomConfig } from '@/types/database'
@@ -16,6 +17,7 @@ interface PublicGridProps {
   selectedAlunoId?: number | null
   onCellClick?: (row: number, col: number) => void
   onSwapStudents?: (fromRow: number, fromCol: number, toRow: number, toCol: number) => void
+  onDeskPreview?: (alunoId: number | null) => void
 }
 
 function getDeskConnections(grid: Grid, row: number, col: number) {
@@ -33,27 +35,80 @@ function getDeskConnections(grid: Grid, row: number, col: number) {
   }
 }
 
-export function PublicGrid({ grid, colunas, alunoMap, roomConfig, editable, selectedAlunoId, onCellClick, onSwapStudents }: PublicGridProps) {
+function getSeatMetrics(colunas: number) {
+  if (colunas >= 7) {
+    return {
+      minWidth: 38,
+      gap: 4,
+    }
+  }
+
+  if (colunas >= 6) {
+    return {
+      minWidth: 44,
+      gap: 6,
+    }
+  }
+
+  return {
+    minWidth: 54,
+    gap: 8,
+  }
+}
+
+export function PublicGrid({
+  grid,
+  colunas,
+  alunoMap,
+  roomConfig,
+  editable,
+  selectedAlunoId,
+  onCellClick,
+  onSwapStudents,
+  onDeskPreview,
+}: PublicGridProps) {
   const allAlunos = Array.from(alunoMap.values())
   const [dragOverCell, setDragOverCell] = useState<{ r: number; c: number } | null>(null)
+  const [supportsPointerDrag, setSupportsPointerDrag] = useState(false)
+  const config = normalizeRoomConfig(roomConfig)
+  const showNumber = config.deskLabels.showNumber
+  const seatMetrics = getSeatMetrics(colunas)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+
+    const mediaQuery = window.matchMedia('(hover: hover) and (pointer: fine)')
+    const updateDragSupport = () => setSupportsPointerDrag(mediaQuery.matches)
+
+    updateDragSupport()
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', updateDragSupport)
+      return () => mediaQuery.removeEventListener('change', updateDragSupport)
+    }
+
+    mediaQuery.addListener(updateDragSupport)
+    return () => mediaQuery.removeListener(updateDragSupport)
+  }, [])
 
   return (
-    <ClassroomFrame roomConfig={roomConfig} compact>
+    <ClassroomFrame roomConfig={config} compact>
       <div
-        className="grid gap-2 sm:gap-2.5"
+        className="grid"
         style={{
-          gridTemplateColumns: `repeat(${colunas}, minmax(60px, 1fr))`,
+          gap: `${seatMetrics.gap}px`,
+          gridTemplateColumns: `repeat(${colunas}, minmax(${seatMetrics.minWidth}px, 1fr))`,
         }}
       >
         {grid.map((row, rIdx) =>
           row.map((cell, cIdx) => {
             if (cell.tipo === 'vazio') {
-              return <div key={`${rIdx}-${cIdx}`} className="h-[58px] sm:h-[68px]" />
+              return <div key={`${rIdx}-${cIdx}`} className="h-[52px] sm:h-[68px]" />
             }
 
             if (cell.tipo === 'bloqueado') {
               return (
-                <div key={`${rIdx}-${cIdx}`} className="flex items-center justify-center rounded-md bg-slate-100 border border-slate-200 h-[58px] sm:h-[68px]">
+                <div key={`${rIdx}-${cIdx}`} className="flex h-[52px] items-center justify-center rounded-md border border-slate-200 bg-slate-100 sm:h-[68px]">
                   <Ban className="size-3 text-slate-400" />
                 </div>
               )
@@ -77,16 +132,20 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig, editable, sele
                   isTarget && 'ring-2 ring-dashed ring-emerald-300 rounded-lg',
                   isDragOver && 'ring-2 ring-emerald-400 rounded-lg bg-emerald-50/50',
                 )}
-                onClick={() => onCellClick?.(rIdx, cIdx)}
+                onClick={() => {
+                  onDeskPreview?.(cell.alunoId ? Number(cell.alunoId) : null)
+                  onCellClick?.(rIdx, cIdx)
+                }}
                 // Drag & drop
-                draggable={editable && occupied}
+                draggable={editable && occupied && supportsPointerDrag}
+                title={aluno ? aluno.nome : undefined}
                 onDragStart={(e) => {
-                  if (!editable || !occupied || !cell.alunoId) return
+                  if (!editable || !occupied || !cell.alunoId || !supportsPointerDrag) return
                   e.dataTransfer.setData('text/plain', `${rIdx},${cIdx}`)
                   e.dataTransfer.effectAllowed = 'move'
                 }}
                 onDragOver={(e) => {
-                  if (!editable) return
+                  if (!editable || !supportsPointerDrag) return
                   e.preventDefault()
                   e.dataTransfer.dropEffect = 'move'
                   setDragOverCell({ r: rIdx, c: cIdx })
@@ -99,7 +158,7 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig, editable, sele
                 onDrop={(e) => {
                   e.preventDefault()
                   setDragOverCell(null)
-                  if (!editable || !onSwapStudents) return
+                  if (!editable || !onSwapStudents || !supportsPointerDrag) return
                   const data = e.dataTransfer.getData('text/plain')
                   const parts = data.split(',')
                   if (parts.length !== 2) return
@@ -155,13 +214,18 @@ export function PublicGrid({ grid, colunas, alunoMap, roomConfig, editable, sele
                 )}>
                   {aluno ? (
                     <>
-                      <div className="flex items-center justify-center w-[22px] h-[22px] rounded-full bg-green-700/10 mb-0.5">
-                        <span className="text-[11px] sm:text-xs font-bold text-green-700 leading-none">
-                          {aluno.numero ?? '?'}
-                        </span>
-                      </div>
-                      <span className="text-[9px] sm:text-[10px] text-gray-700 truncate block leading-tight max-w-full font-medium">
-                        {displayName(aluno, allAlunos)}
+                      {showNumber && (
+                        <div className="flex items-center justify-center w-[22px] h-[22px] rounded-full bg-green-700/10 mb-0.5">
+                          <span className="text-[11px] sm:text-xs font-bold text-green-700 leading-none">
+                            {aluno.numero ?? '?'}
+                          </span>
+                        </div>
+                      )}
+                      <span className={cn(
+                        'text-gray-700 truncate block leading-tight max-w-full font-medium',
+                        showNumber ? 'text-[9px] sm:text-[10px]' : 'text-[10px] sm:text-[11px]'
+                      )}>
+                        {displayName(aluno, allAlunos, config.deskLabels.nameMode)}
                       </span>
                     </>
                   ) : isDragOver ? (

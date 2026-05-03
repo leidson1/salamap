@@ -285,7 +285,7 @@ export function ClassroomFrame({
               <div className={`mx-3 border-t border-dashed border-slate-200 ${compact ? 'mb-1' : 'mb-2'}`} />
             )}
 
-            <div className={compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4'}>
+            <div className={compact ? 'p-1.5 sm:p-3' : 'p-3 sm:p-4'}>
               {children}
             </div>
 

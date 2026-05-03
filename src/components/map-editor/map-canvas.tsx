@@ -5,9 +5,8 @@ import { Stage, Layer, Rect, Group, Text, Line, Circle } from 'react-konva'
 import type Konva from 'konva'
 import type { FurnitureTool } from '@/lib/map/furniture-tools'
 import type { Grid, Aluno, RoomConfig } from '@/types/database'
-import { clampWallPosition } from '@/lib/map/room-config'
+import { clampWallPosition, normalizeRoomConfig } from '@/lib/map/room-config'
 import { getCellBlockId, displayName } from '@/lib/map/utils'
-import { DEFAULT_ROOM_CONFIG } from '@/types/database'
 
 // Layout constants
 const CELL_W = 90
@@ -37,6 +36,7 @@ interface MapCanvasProps {
   onFurnitureBlockSelect?: (blockId: string | null) => void
   onRoomConfigChange?: (config: RoomConfig) => void
   onRoomElementSelect?: (elementId: string | null) => void
+  onDeskPreview?: (alunoId: number | null) => void
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -131,9 +131,10 @@ const COLORS = {
   windowBorder: '#7dd3fc',
 }
 
-function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, selected, connections }: {
+function DeskShape({ x, y, w, h, occupied, studentName, studentNum, showNumber, isDragOver, selected, connections }: {
   x: number; y: number; w: number; h: number
   occupied: boolean; studentName?: string; studentNum?: number | null
+  showNumber: boolean
   isDragOver?: boolean
   selected?: boolean
   connections: DeskConnections
@@ -208,23 +209,27 @@ function DeskShape({ x, y, w, h, occupied, studentName, studentNum, isDragOver, 
         strokeWidth={selected || occupied ? 2 : 1}
       />
       {/* Student info */}
-      {occupied && studentNum !== undefined && (
+      {occupied && (
         <>
-          <Circle
-            x={w / 2} y={deskH * 0.32}
-            radius={11}
-            fill={COLORS.studentNum} opacity={0.1}
-          />
+          {showNumber && studentNum !== undefined && (
+            <>
+              <Circle
+                x={w / 2} y={deskH * 0.32}
+                radius={11}
+                fill={COLORS.studentNum} opacity={0.1}
+              />
+              <Text
+                x={0} y={deskH * 0.18} width={w}
+                text={String(studentNum ?? '?')}
+                fontSize={12} fontStyle="bold" fill={COLORS.studentNum}
+                align="center"
+              />
+            </>
+          )}
           <Text
-            x={0} y={deskH * 0.18} width={w}
-            text={String(studentNum ?? '?')}
-            fontSize={12} fontStyle="bold" fill={COLORS.studentNum}
-            align="center"
-          />
-          <Text
-            x={4} y={deskH * 0.52} width={w - 8}
+            x={4} y={showNumber ? deskH * 0.52 : deskH * 0.4} width={w - 8}
             text={studentName ?? ''}
-            fontSize={10} fill={COLORS.studentName}
+            fontSize={showNumber ? 10 : 11} fill={COLORS.studentName}
             align="center" ellipsis wrap="none"
           />
         </>
@@ -508,14 +513,14 @@ function WallElements({ config, canvasW, canvasH, interactive, selectedElementId
 
 export function MapCanvas({
   grid, colunas, linhas, alunos, roomConfig, mode, furnitureTool, selectedStudentId, selectedFurnitureBlockId, selectedRoomElementId,
-  onStudentPlace, onStudentRemove, onCellSwap, onFurnitureStamp, onFurnitureBlockSelect, onRoomConfigChange, onRoomElementSelect,
+  onStudentPlace, onStudentRemove, onCellSwap, onFurnitureStamp, onFurnitureBlockSelect, onRoomConfigChange, onRoomElementSelect, onDeskPreview,
 }: MapCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(900)
   const [dragOverCell, setDragOverCell] = useState<{ r: number; c: number } | null>(null)
 
-  const config = roomConfig ?? DEFAULT_ROOM_CONFIG
+  const config = normalizeRoomConfig(roomConfig)
   const alunoMap = new Map(alunos.map((a) => [Number(a.id), a]))
   const { totalW, totalH } = getCanvasSize(linhas, colunas)
 
@@ -611,6 +616,9 @@ export function MapCanvas({
         className="rounded-xl"
         style={{ background: COLORS.floor }}
         onMouseDown={(event) => {
+          if (event.target === event.target.getStage()) {
+            onDeskPreview?.(null)
+          }
           if (mode === 'sala' && event.target === event.target.getStage()) {
             onRoomElementSelect?.(null)
           }
@@ -676,11 +684,12 @@ export function MapCanvas({
               if (cell.tipo === 'vazio') {
                 return (
                   <Group
-                    key={`${rIdx}-${cIdx}`}
-                    onClick={() => {
-                      if (mode === 'mobiliar') {
-                        if (furnitureTool !== 'move') {
-                          onFurnitureStamp(rIdx, cIdx)
+                  key={`${rIdx}-${cIdx}`}
+                  onClick={() => {
+                    onDeskPreview?.(null)
+                    if (mode === 'mobiliar') {
+                      if (furnitureTool !== 'move') {
+                        onFurnitureStamp(rIdx, cIdx)
                         } else {
                           onFurnitureBlockSelect?.(null)
                         }
@@ -699,11 +708,12 @@ export function MapCanvas({
               if (cell.tipo === 'bloqueado') {
                 return (
                   <Group
-                    key={`${rIdx}-${cIdx}`}
-                    onClick={() => {
-                      if (mode === 'mobiliar') {
-                        if (furnitureTool !== 'move') {
-                          onFurnitureStamp(rIdx, cIdx)
+                  key={`${rIdx}-${cIdx}`}
+                  onClick={() => {
+                    onDeskPreview?.(null)
+                    if (mode === 'mobiliar') {
+                      if (furnitureTool !== 'move') {
+                        onFurnitureStamp(rIdx, cIdx)
                         } else {
                           onFurnitureBlockSelect?.(null)
                         }
@@ -731,6 +741,7 @@ export function MapCanvas({
                   key={`${rIdx}-${cIdx}`}
                   draggable={mode === 'mobiliar' && furnitureTool === 'move'}
                   onClick={() => {
+                    onDeskPreview?.(cell.alunoId ? Number(cell.alunoId) : null)
                     if (mode === 'alunos') {
                       if (aluno && cell.alunoId) {
                         if (selectedStudentId && selectedStudentId !== Number(cell.alunoId)) {
@@ -776,8 +787,9 @@ export function MapCanvas({
                   <DeskShape
                     x={pos.x} y={pos.y} w={CELL_W} h={CELL_H}
                     occupied={!!aluno}
-                    studentName={aluno ? displayName(aluno, alunos) : undefined}
+                    studentName={aluno ? displayName(aluno, alunos, config.deskLabels.nameMode) : undefined}
                     studentNum={aluno?.numero}
+                    showNumber={config.deskLabels.showNumber}
                     isDragOver={isOver}
                     selected={selected}
                     connections={connections}

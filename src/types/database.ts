@@ -38,6 +38,23 @@ export interface GridCell {
 
 export type Grid = GridCell[][]
 
+export type DeskNameMode =
+  | 'apelido_ou_curto'
+  | 'primeiro_nome'
+  | 'primeiro_e_segundo'
+  | 'primeiro_e_iniciais'
+  | 'nome_completo'
+
+export interface DeskLabelConfig {
+  nameMode: DeskNameMode
+  showNumber: boolean
+}
+
+export const DEFAULT_DESK_LABEL_CONFIG: DeskLabelConfig = {
+  nameMode: 'apelido_ou_curto',
+  showNumber: true,
+}
+
 export type WallSide = 'top' | 'bottom' | 'left' | 'right'
 
 export interface WallElement {
@@ -53,6 +70,7 @@ export interface RoomConfig {
   boardLabel: string
   teacherDesk: 'left' | 'center' | 'right' | 'none'
   wallElements: WallElement[]
+  deskLabels: DeskLabelConfig
 }
 
 export const DEFAULT_ROOM_CONFIG: RoomConfig = {
@@ -65,6 +83,7 @@ export const DEFAULT_ROOM_CONFIG: RoomConfig = {
     { id: 'janela-2', type: 'janela', wall: 'left', position: 50, size: 2 },
     { id: 'janela-3', type: 'janela', wall: 'left', position: 75, size: 2 },
   ],
+  deskLabels: DEFAULT_DESK_LABEL_CONFIG,
 }
 
 export interface Mapa {
@@ -164,5 +183,5 @@ export interface PublicMapData {
   professor: {
     nome: string
   }
-  alunos: Array<{ id: number; nome: string; numero: number }>
+  alunos: Array<{ id: number; nome: string; numero: number; apelido?: string | null }>
 }

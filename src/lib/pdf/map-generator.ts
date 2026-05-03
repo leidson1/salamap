@@ -2,6 +2,7 @@ import jsPDF from 'jspdf'
 import { generateQrDataUrl } from '@/components/qr-code-card'
 import type { Grid, RoomConfig, WallElement } from '@/types/database'
 import { DEFAULT_ROOM_CONFIG } from '@/types/database'
+import { normalizeRoomConfig } from '@/lib/map/room-config'
 import { getCellBlockId, displayName } from '@/lib/map/utils'
 
 interface MapPdfOptions {
@@ -84,7 +85,7 @@ export function generateMapPdf(options: MapPdfOptions) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
   const pageH = doc.internal.pageSize.getHeight()
-  const config = roomConfig ?? DEFAULT_ROOM_CONFIG
+  const config = normalizeRoomConfig(roomConfig ?? DEFAULT_ROOM_CONFIG)
   const boardAtTop = config.boardWall === 'top'
 
   // --- Layout calculations ---
@@ -298,26 +299,28 @@ export function generateMapPdf(options: MapPdfOptions) {
 
       // Student info
       if (aluno) {
-        // Number circle bg
-        doc.setFillColor(...rgb(C.studentNum))
-        doc.setGState(doc.GState({ opacity: 0.08 }))
-        doc.circle(x + cellW / 2, y + deskH * 0.32, 2.2, 'F')
-        doc.setGState(doc.GState({ opacity: 1 }))
+        if (config.deskLabels.showNumber) {
+          // Number circle bg
+          doc.setFillColor(...rgb(C.studentNum))
+          doc.setGState(doc.GState({ opacity: 0.08 }))
+          doc.circle(x + cellW / 2, y + deskH * 0.32, 2.2, 'F')
+          doc.setGState(doc.GState({ opacity: 1 }))
 
-        // Number
-        doc.setTextColor(...rgb(C.studentNum))
-        doc.setFontSize(6)
-        doc.setFont('helvetica', 'bold')
-        doc.text(`${aluno.numero ?? '?'}`, x + cellW / 2, y + deskH * 0.37, { align: 'center' })
+          // Number
+          doc.setTextColor(...rgb(C.studentNum))
+          doc.setFontSize(6)
+          doc.setFont('helvetica', 'bold')
+          doc.text(`${aluno.numero ?? '?'}`, x + cellW / 2, y + deskH * 0.37, { align: 'center' })
+        }
 
         // Name
         doc.setTextColor(...rgb(C.studentName))
-        doc.setFontSize(4.5)
+        doc.setFontSize(config.deskLabels.showNumber ? 4.5 : 5)
         doc.setFont('helvetica', 'normal')
         const maxChars = Math.floor(cellW / 1.8)
-        const nome = displayName(aluno, allAlunosList)
+        const nome = displayName(aluno, allAlunosList, config.deskLabels.nameMode)
         const nomeExibido = nome.length > maxChars ? nome.substring(0, maxChars) + '..' : nome
-        doc.text(nomeExibido, x + cellW / 2, y + deskH * 0.68, { align: 'center' })
+        doc.text(nomeExibido, x + cellW / 2, y + (config.deskLabels.showNumber ? deskH * 0.68 : deskH * 0.52), { align: 'center' })
       }
 
       // Chair

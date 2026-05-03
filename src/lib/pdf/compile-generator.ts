@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import { generateQrDataUrl } from '@/components/qr-code-card'
 import type { Grid, RoomConfig } from '@/types/database'
+import { normalizeRoomConfig } from '@/lib/map/room-config'
 import { getCellBlockId, displayName } from '@/lib/map/utils'
 
 interface TurmaMapData {
@@ -11,7 +12,7 @@ interface TurmaMapData {
   linhas: number
   colunas: number
   roomConfig?: RoomConfig | null
-  alunoMap: Map<number, { nome: string; numero: number | null }>
+  alunoMap: Map<number, { nome: string; numero: number | null; apelido?: string | null }>
   shareUrl?: string
 }
 
@@ -55,12 +56,13 @@ function renderMapPage(
 ) {
   const pageW = doc.internal.pageSize.getWidth()
   const pageH = doc.internal.pageSize.getHeight()
+  const config = normalizeRoomConfig(t.roomConfig)
 
   const headerH = 18
   const footerH = 8
   const marginX = 12
   const wallT = 5
-  const teacherH = t.roomConfig?.teacherDesk !== 'none' ? 10 : 0
+  const teacherH = config.teacherDesk !== 'none' ? 10 : 0
   const boardH = 4
 
   const innerTop = headerH + wallT + boardH + teacherH + 2
@@ -174,12 +176,19 @@ function renderMapPage(
       doc.setLineWidth(occupied ? 0.3 : 0.15)
       doc.roundedRect(x, y, cellW, deskH, 1, 1, 'FD')
       if (aluno) {
-        doc.setTextColor(...rgb(C.studentNum)); doc.setFontSize(6); doc.setFont('helvetica', 'bold')
-        doc.text(`${aluno.numero ?? '?'}`, x + cellW / 2, y + deskH * 0.37, { align: 'center' })
-        doc.setTextColor(...rgb(C.studentName)); doc.setFontSize(4.5); doc.setFont('helvetica', 'normal')
+        if (config.deskLabels.showNumber) {
+          doc.setTextColor(...rgb(C.studentNum)); doc.setFontSize(6); doc.setFont('helvetica', 'bold')
+          doc.text(`${aluno.numero ?? '?'}`, x + cellW / 2, y + deskH * 0.37, { align: 'center' })
+        }
+        doc.setTextColor(...rgb(C.studentName)); doc.setFontSize(config.deskLabels.showNumber ? 4.5 : 5); doc.setFont('helvetica', 'normal')
         const maxChars = Math.floor(cellW / 1.8)
-        const nome = displayName(aluno, Array.from(t.alunoMap.values()))
-        doc.text(nome.length > maxChars ? nome.substring(0, maxChars) + '..' : nome, x + cellW / 2, y + deskH * 0.68, { align: 'center' })
+        const nome = displayName(aluno, Array.from(t.alunoMap.values()), config.deskLabels.nameMode)
+        doc.text(
+          nome.length > maxChars ? nome.substring(0, maxChars) + '..' : nome,
+          x + cellW / 2,
+          y + (config.deskLabels.showNumber ? deskH * 0.68 : deskH * 0.52),
+          { align: 'center' }
+        )
       }
       // Chair
       const cW = Math.min(cellW * 0.4, 4)

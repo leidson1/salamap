@@ -1,4 +1,20 @@
-import type { Grid, GridCell } from '@/types/database'
+import type { DeskNameMode, Grid, GridCell } from '@/types/database'
+import { DEFAULT_DESK_LABEL_CONFIG } from '@/types/database'
+
+type StudentLike = {
+  id: number
+  nome: string
+  numero?: number | null
+  apelido?: string | null
+}
+
+export const DESK_NAME_MODE_LABELS: Record<DeskNameMode, string> = {
+  apelido_ou_curto: 'Apelido ou nome curto',
+  primeiro_nome: 'Primeiro nome',
+  primeiro_e_segundo: 'Dois primeiros nomes',
+  primeiro_e_iniciais: 'Primeiro nome + iniciais',
+  nome_completo: 'Nome completo',
+}
 
 export function createSoloBlockId(row: number, col: number): string {
   return `solo-${row}-${col}`
@@ -70,24 +86,104 @@ export function generateShareCode(): string {
   return code
 }
 
+function splitName(fullName: string): string[] {
+  return fullName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+export function firstName(fullName: string): string {
+  return splitName(fullName)[0] || ''
+}
+
+export function firstTwoNames(fullName: string): string {
+  return splitName(fullName).slice(0, 2).join(' ')
+}
+
 /**
  * Nome curto: primeiro nome + iniciais de todos os sobrenomes
- * "João Pedro Brito" → "João P. B."
- * "Maria Santos" → "Maria S."
- * "Pedro" → "Pedro"
+ * "Joao Pedro Brito" -> "Joao P. B."
+ * "Maria Santos" -> "Maria S."
+ * "Pedro" -> "Pedro"
  */
 export function shortName(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/)
+  const parts = splitName(fullName)
   if (parts.length <= 1) return parts[0] || ''
   const first = parts[0]
-  const initials = parts.slice(1).map(p => p[0]?.toUpperCase() + '.').join(' ')
+  const initials = parts.slice(1).map((part) => part[0]?.toUpperCase() + '.').join(' ')
   return `${first} ${initials}`
 }
 
 /**
- * Nome de exibição: usa apelido se existir, senão nome curto.
+ * Nome de exibicao: usa apelido se existir, senao aplica a regra escolhida.
  */
-export function displayName(aluno: { nome: string; apelido?: string | null }, _allAlunos?: Array<{ nome: string; apelido?: string | null }>): string {
+export function displayName(
+  aluno: { nome: string; apelido?: string | null },
+  _allAlunos?: Array<{ nome: string; apelido?: string | null }>,
+  mode: DeskNameMode = DEFAULT_DESK_LABEL_CONFIG.nameMode
+): string {
   if (aluno.apelido?.trim()) return aluno.apelido.trim()
+
+  if (mode === 'primeiro_nome') return firstName(aluno.nome)
+  if (mode === 'primeiro_e_segundo') return firstTwoNames(aluno.nome)
+  if (mode === 'primeiro_e_iniciais') return shortName(aluno.nome)
+  if (mode === 'nome_completo') return aluno.nome.trim()
   return shortName(aluno.nome)
+}
+
+export function sortStudentsForPlacement<T extends Pick<StudentLike, 'nome' | 'numero'>>(alunos: T[]): T[] {
+  return [...alunos].sort((a, b) => {
+    const numeroA = a.numero ?? Number.MAX_SAFE_INTEGER
+    const numeroB = b.numero ?? Number.MAX_SAFE_INTEGER
+    if (numeroA !== numeroB) return numeroA - numeroB
+    return a.nome.localeCompare(b.nome, 'pt-BR')
+  })
+}
+
+export function getSeatPositions(grid: Grid, boardWall: 'top' | 'bottom' = 'top') {
+  const rowIndexes = Array.from({ length: grid.length }, (_, index) => index)
+  if (boardWall === 'bottom') rowIndexes.reverse()
+
+  const positions: Array<{ row: number; col: number }> = []
+
+  for (const rowIndex of rowIndexes) {
+    const row = grid[rowIndex] ?? []
+    for (let col = 0; col < row.length; col++) {
+      if (row[col]?.tipo === 'carteira') {
+        positions.push({ row: rowIndex, col })
+      }
+    }
+  }
+
+  return positions
+}
+
+export function autoPlaceStudents<T extends StudentLike>(
+  grid: Grid,
+  alunos: T[],
+  boardWall: 'top' | 'bottom' = 'top'
+) {
+  const nextGrid = grid.map((row) =>
+    row.map((cell) => ({
+      ...cell,
+      alunoId: cell.tipo === 'carteira' ? null : cell.alunoId,
+    }))
+  )
+  const orderedStudents = sortStudentsForPlacement(alunos)
+  const seatPositions = getSeatPositions(nextGrid, boardWall)
+  const placedCount = Math.min(orderedStudents.length, seatPositions.length)
+
+  for (let index = 0; index < placedCount; index++) {
+    const seat = seatPositions[index]
+    nextGrid[seat.row][seat.col].alunoId = orderedStudents[index].id
+  }
+
+  return {
+    grid: nextGrid,
+    placedCount,
+    unplacedCount: Math.max(0, orderedStudents.length - placedCount),
+    emptySeatCount: Math.max(0, seatPositions.length - placedCount),
+    totalSeats: seatPositions.length,
+  }
 }

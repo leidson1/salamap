@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
+import { DeskStudentPreview } from '@/components/map/desk-student-preview'
 import { MapCanvasWrapper } from '@/components/map-editor/map-canvas-wrapper'
 import { FurnitureStudioPanel } from '@/components/map-editor/furniture-studio-panel'
 import { RoomDesignerPanel } from '@/components/map-editor/room-designer-panel'
@@ -32,7 +33,7 @@ import {
 } from '@/lib/map/furniture-tools'
 import { clearAllFurniture, clearStudentsFromGrid, generateTradicional, getLayoutGenerator } from '@/lib/map/presets'
 import { normalizeRoomConfig } from '@/lib/map/room-config'
-import { createSoloBlockId, resizeGrid, getPlacedStudentIds } from '@/lib/map/utils'
+import { autoPlaceStudents, createSoloBlockId, resizeGrid, getPlacedStudentIds } from '@/lib/map/utils'
 import type { Turma, Aluno, Grid, Mapa, RoomConfig } from '@/types/database'
 import { DEFAULT_ROOM_CONFIG } from '@/types/database'
 
@@ -74,6 +75,7 @@ export default function MapaEditorPage() {
   const [selectedFurnitureBlockId, setSelectedFurnitureBlockId] = useState<string | null>(null)
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
   const [selectedRoomElementId, setSelectedRoomElementId] = useState<string | null>('board')
+  const [previewAlunoId, setPreviewAlunoId] = useState<number | null>(null)
   const mapaRef = useRef<Mapa | null>(null)
 
   const saveFn = useCallback(async () => {
@@ -230,6 +232,7 @@ export default function MapaEditorPage() {
     // NÃO salvar aqui — salva quando o aluno for reposicionado
     if (removedAlunoId) {
       setSelectedStudentId(Number(removedAlunoId))
+      setPreviewAlunoId(Number(removedAlunoId))
     } else {
       triggerSave()
     }
@@ -274,9 +277,15 @@ export default function MapaEditorPage() {
     setRoomConfig(normalizeRoomConfig(config)); triggerSave()
   }, [triggerSave])
 
+  const handleDeskLabelConfigChange = useCallback((deskLabels: RoomConfig['deskLabels']) => {
+    setRoomConfig((prev) => normalizeRoomConfig({ ...prev, deskLabels }))
+    triggerSave()
+  }, [triggerSave])
+
   const handleModeChange = useCallback((nextMode: 'alunos' | 'mobiliar' | 'sala') => {
     setMode(nextMode)
     if (nextMode !== 'alunos') setSelectedStudentId(null)
+    if (nextMode !== 'alunos') setPreviewAlunoId(null)
     if (nextMode === 'mobiliar') setFurnitureTool((current) => current ?? 'move')
     if (nextMode !== 'mobiliar') setSelectedFurnitureBlockId(null)
     if (nextMode === 'sala') {
@@ -432,9 +441,40 @@ export default function MapaEditorPage() {
 
     setGrid(prev => clearStudentsFromGrid(prev))
     setSelectedStudentId(null)
+    setPreviewAlunoId(null)
     triggerSave()
   }, [mode, grid, linhas, colunas, triggerSave])
   const handleReset = useCallback(() => handleLayoutChange(layoutTipo), [layoutTipo, handleLayoutChange])
+
+  const handleAutoFill = useCallback(() => {
+    if (mode !== 'alunos') return
+    if (alunos.length === 0) {
+      toast.error('Cadastre alunos antes de usar o preenchimento automático.')
+      return
+    }
+
+    const alreadyPlaced = getPlacedStudentIds(grid).length
+    if (alreadyPlaced > 0 && !window.confirm('O preenchimento automático vai reorganizar as posições atuais dos alunos. Continuar?')) {
+      return
+    }
+
+    const result = autoPlaceStudents(grid, alunos, roomConfig.boardWall)
+    setGrid(result.grid)
+    setSelectedStudentId(null)
+    setPreviewAlunoId(null)
+    triggerSave()
+
+    if (result.unplacedCount > 0) {
+      toast.warning(`Mapa preenchido com ${result.placedCount} aluno(s). ${result.unplacedCount} ficaram sem lugar.`)
+      return
+    }
+
+    toast.success(
+      result.emptySeatCount > 0
+        ? `Mapa preenchido. ${result.emptySeatCount} lugar(es) ficaram vazios.`
+        : 'Mapa preenchido automaticamente.'
+    )
+  }, [mode, alunos, grid, roomConfig.boardWall, triggerSave])
 
   const handleManualSave = useCallback(async () => {
     try { await flushSave(); toast.success('Mapa salvo!') } catch { toast.error('Erro ao salvar.') }
@@ -456,6 +496,7 @@ export default function MapaEditorPage() {
   const placedIds = getPlacedStudentIds(grid)
   const seatCount = grid.reduce((sum, row) => sum + row.filter((cell) => cell.tipo === 'carteira').length, 0)
   const blockedCount = grid.reduce((sum, row) => sum + row.filter((cell) => cell.tipo === 'bloqueado').length, 0)
+  const previewAluno = previewAlunoId ? alunos.find((aluno) => aluno.id === previewAlunoId) ?? null : null
   const modeMeta = mode === 'alunos'
     ? {
         label: 'Modo Alunos',
@@ -618,6 +659,14 @@ export default function MapaEditorPage() {
               </div>
             </CardHeader>
             <CardContent className="p-3 sm:p-4">
+              {mode === 'alunos' && previewAluno && (
+                <DeskStudentPreview
+                  aluno={previewAluno}
+                  nameMode={roomConfig.deskLabels.nameMode}
+                  className="mb-3"
+                  onClear={() => setPreviewAlunoId(null)}
+                />
+              )}
               <MapCanvasWrapper
                 grid={grid} colunas={colunas} linhas={linhas} alunos={alunos}
                 roomConfig={roomConfig} mode={mode}
@@ -625,13 +674,18 @@ export default function MapaEditorPage() {
                 selectedStudentId={selectedStudentId}
                 selectedFurnitureBlockId={selectedFurnitureBlockId}
                 selectedRoomElementId={selectedRoomElementId}
-                onStudentPlace={(alunoId, row, col) => { handleStudentPlace(alunoId, row, col); setSelectedStudentId(null) }}
+                onStudentPlace={(alunoId, row, col) => {
+                  handleStudentPlace(alunoId, row, col)
+                  setSelectedStudentId(null)
+                  setPreviewAlunoId(alunoId)
+                }}
                 onStudentRemove={handleStudentRemove}
                 onCellSwap={handleCellSwap}
                 onFurnitureStamp={handleFurnitureStamp}
                 onFurnitureBlockSelect={setSelectedFurnitureBlockId}
                 onRoomConfigChange={handleRoomConfigChange}
                 onRoomElementSelect={setSelectedRoomElementId}
+                onDeskPreview={setPreviewAlunoId}
               />
             </CardContent>
           </Card>
@@ -641,8 +695,14 @@ export default function MapaEditorPage() {
         {mode === 'alunos' && (
           <StudentSidebar
             alunos={alunos} placedIds={placedIds}
+            displayConfig={roomConfig.deskLabels}
             selectedStudentId={selectedStudentId}
-            onSelectStudent={setSelectedStudentId}
+            onSelectStudent={(alunoId) => {
+              setSelectedStudentId(alunoId)
+              setPreviewAlunoId(alunoId)
+            }}
+            onDisplayConfigChange={handleDeskLabelConfigChange}
+            onAutoFill={handleAutoFill}
             onAddStudent={async (nome) => {
               const { data: { user } } = await supabase.auth.getUser()
               if (!user) return

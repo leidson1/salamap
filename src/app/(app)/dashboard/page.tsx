@@ -141,14 +141,14 @@ export default function DashboardPage() {
     const turmaDataList = await Promise.all(turmasWithMaps.map(async (t) => {
       const [mapaRes, alunosRes] = await Promise.all([
         supabase.from('mapas').select('*').eq('turma_id', t.id).single(),
-        supabase.from('sala_alunos').select('id, nome, numero').eq('turma_id', t.id).eq('ativo', true),
+        supabase.from('sala_alunos').select('id, nome, numero, apelido').eq('turma_id', t.id).eq('ativo', true),
       ])
       if (!mapaRes.data) return null
       const m = mapaRes.data
       return { serie: t.serie, turma: t.turma, turno: t.turno, grid: m.grid, linhas: m.linhas, colunas: m.colunas, roomConfig: m.room_config,
-        alunoMap: new Map((alunosRes.data || []).map((a: { id: number; nome: string; numero: number | null }) => [Number(a.id), a])) }
+        alunoMap: new Map((alunosRes.data || []).map((a: { id: number; nome: string; numero: number | null; apelido?: string | null }) => [Number(a.id), a])) }
     }))
-    const valid = turmaDataList.filter(Boolean) as Array<{ serie: string; turma: string; turno: string; grid: Grid; linhas: number; colunas: number; roomConfig: RoomConfig | null; alunoMap: Map<number, { nome: string; numero: number | null }> }>
+    const valid = turmaDataList.filter(Boolean) as Array<{ serie: string; turma: string; turno: string; grid: Grid; linhas: number; colunas: number; roomConfig: RoomConfig | null; alunoMap: Map<number, { nome: string; numero: number | null; apelido?: string | null }> }>
     const { generateAllMapsPdf } = await import('@/lib/pdf/compile-generator')
     generateAllMapsPdf({ turmas: valid, escolaNome: escola?.nome, escolaLogoUrl: escola?.logo_url || undefined })
   }, [turmas, supabase, escola])

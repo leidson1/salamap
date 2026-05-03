@@ -151,6 +151,7 @@ BEGIN
   SELECT jsonb_build_object(
     'mapa', jsonb_build_object(
       'id', m.id,
+      'turma_id', m.turma_id,
       'nome', m.nome,
       'linhas', m.linhas,
       'colunas', m.colunas,
@@ -170,7 +171,7 @@ BEGIN
     ),
     'alunos', (
       SELECT COALESCE(jsonb_agg(
-        jsonb_build_object('id', a.id, 'nome', a.nome, 'numero', a.numero)
+        jsonb_build_object('id', a.id, 'nome', a.nome, 'numero', a.numero, 'apelido', a.apelido)
         ORDER BY a.numero
       ), '[]'::jsonb)
       FROM sala_alunos a

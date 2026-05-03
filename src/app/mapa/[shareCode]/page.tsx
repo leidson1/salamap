@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { DeskStudentPreview } from '@/components/map/desk-student-preview'
 import { PublicGrid } from '@/components/map-viewer/public-grid'
 import { StudentList } from '@/components/map-viewer/student-list'
 import {
@@ -13,6 +14,8 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { cn } from '@/lib/utils'
 import type { PublicMapData, Grid } from '@/types/database'
 
 function timeAgo(dateStr: string) {
@@ -49,7 +52,10 @@ export default function SharedMapPage() {
   const [turmaId, setTurmaId] = useState<number | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [requestSent, setRequestSent] = useState(false)
+  const [requestUnavailable, setRequestUnavailable] = useState(false)
   const [lastEditor, setLastEditor] = useState<string | null>(null)
+  const [previewAlunoId, setPreviewAlunoId] = useState<number | null>(null)
+  const [studentSheetOpen, setStudentSheetOpen] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
@@ -64,12 +70,13 @@ export default function SharedMapPage() {
         return
       }
 
-      setMapData(data as PublicMapData)
-      setMapaId((data as PublicMapData).mapa.id)
-      // turma_id vem da RPC
-      if ((data as PublicMapData).mapa.turma_id) {
-        setTurmaId((data as PublicMapData).mapa.turma_id!)
-      }
+      const md = data as PublicMapData
+      const rpcTurmaId = md.mapa.turma_id ?? null
+
+      setMapData(md)
+      setMapaId(md.mapa.id)
+      setTurmaId(rpcTurmaId)
+      setRequestUnavailable(!rpcTurmaId)
 
       // Verificar se está logado
       const { data: { user } } = await supabase.auth.getUser()
@@ -84,16 +91,6 @@ export default function SharedMapPage() {
       setIsLoggedIn(true)
       setUserId(user.id)
 
-      // Verificar se já solicitou acesso (tabela pode não existir)
-      try {
-        const { data: existingRequest } = await supabase
-          .from('solicitacoes_acesso')
-          .select('id, status')
-          .eq('user_id', user.id)
-          .maybeSingle()
-        if (existingRequest) setRequestSent(true)
-      } catch {}
-
       // Buscar nome do usuário
       const { data: profile } = await supabase
         .from('profiles')
@@ -104,12 +101,22 @@ export default function SharedMapPage() {
       if (profile) setUserName(profile.nome)
 
       // Verificar permissão
-      const md = data as PublicMapData
-
       // Verificar permissões usando turma_id da RPC
-      const rpcTurmaId = md.mapa.turma_id
       let foundAccess = false
       let turmaOwnerId: string | null = null
+
+      // Verificar se já solicitou acesso para esta turma (tabela pode não existir)
+      if (rpcTurmaId) {
+        try {
+          const { data: existingRequest } = await supabase
+            .from('solicitacoes_acesso')
+            .select('id, status')
+            .eq('turma_id', rpcTurmaId)
+            .eq('user_id', user.id)
+            .maybeSingle()
+          if (existingRequest) setRequestSent(true)
+        } catch {}
+      }
 
       // 1. Dono da turma → editor
       if (rpcTurmaId) {
@@ -175,6 +182,17 @@ export default function SharedMapPage() {
   }, [supabase, shareCode])
 
   useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    if (!editMode) {
+      setStudentSheetOpen(false)
+    }
+  }, [editMode])
+
+  const handleSelectAlunoFromList = useCallback((alunoId: number) => {
+    setSelectedAlunoId(alunoId)
+    setPreviewAlunoId(alunoId)
+    setStudentSheetOpen(false)
+  }, [])
 
   // Edição: trocar aluno de mesa (com swap)
   const handleCellClick = useCallback(async (rIdx: number, cIdx: number) => {
@@ -234,11 +252,13 @@ export default function SharedMapPage() {
         ...mapData,
         mapa: { ...mapData.mapa, grid: newGrid, updated_at: new Date().toISOString() }
       })
+      setPreviewAlunoId(selectedAlunoId)
       setSelectedAlunoId(null)
       toast.success(cellAlunoId ? 'Alunos trocados!' : 'Aluno movido!')
     } else if (cellAlunoId) {
       // Selecionar aluno pra mover/trocar
       setSelectedAlunoId(cellAlunoId)
+      setPreviewAlunoId(cellAlunoId)
     }
   }, [editMode, mapData, mapaId, selectedAlunoId, supabase])
 
@@ -274,16 +294,23 @@ export default function SharedMapPage() {
       ...mapData,
       mapa: { ...mapData.mapa, grid: newGrid, updated_at: new Date().toISOString() }
     })
+    setPreviewAlunoId(fromAlunoId ? Number(fromAlunoId) : null)
     setSelectedAlunoId(null)
     toast.success(toAlunoId ? 'Alunos trocados!' : 'Aluno movido!')
   }, [editMode, mapData, mapaId, supabase])
 
   // Solicitar acesso
   async function handleRequestAccess() {
-    if (!userId || !turmaId) {
-      toast.error('Erro ao solicitar acesso.')
+    if (!userId) {
+      toast.error('Faça login para solicitar acesso.')
       return
     }
+
+    if (!turmaId) {
+      toast.error('Este link precisa ser atualizado pelo administrador antes de receber solicitações.')
+      return
+    }
+
     try {
       const { error } = await supabase.from('solicitacoes_acesso').insert({
         turma_id: turmaId,
@@ -299,7 +326,8 @@ export default function SharedMapPage() {
         toast.success('Solicitação enviada! O coordenador será notificado.')
       }
       setRequestSent(true)
-    } catch {
+    } catch (error) {
+      console.error('[SalaMap] Request access error:', error)
       toast.error('Erro ao solicitar acesso.')
     }
   }
@@ -380,11 +408,21 @@ export default function SharedMapPage() {
           <p className="text-xs text-muted-foreground">
             Peça ao coordenador para convidá-lo ou entre na equipe da escola.
           </p>
+          {requestUnavailable && (
+            <p className="text-xs text-amber-700">
+              Este link de compartilhamento está desatualizado e precisa ser corrigido pelo administrador para aceitar solicitações.
+            </p>
+          )}
           <div className="flex gap-2 justify-center">
             {requestSent ? (
               <Button disabled variant="outline">
                 <Clock className="size-4 mr-1.5" />
                 Solicitação enviada
+              </Button>
+            ) : requestUnavailable ? (
+              <Button disabled variant="outline">
+                <AlertCircle className="size-4 mr-1.5" />
+                Solicitação indisponível
               </Button>
             ) : (
               <Button onClick={handleRequestAccess}>
@@ -412,12 +450,21 @@ export default function SharedMapPage() {
     (sum, row) => sum + row.filter((c) => c.alunoId != null).length, 0
   )
   const totalAlunos = mapData.alunos?.length ?? 0
+  const placedAlunoIds = new Set(
+    mapData.mapa.grid.flatMap((row) => row.map((cell) => cell.alunoId).filter((alunoId): alunoId is number => alunoId != null))
+  )
+  const selectedAluno = selectedAlunoId
+    ? mapData.alunos.find((aluno) => Number(aluno.id) === selectedAlunoId) ?? null
+    : null
+  const previewAluno = previewAlunoId
+    ? mapData.alunos.find((aluno) => Number(aluno.id) === previewAlunoId) ?? null
+    : null
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b bg-white/95 backdrop-blur-sm shadow-sm">
-        <div className="mx-auto max-w-3xl px-4 py-2.5">
+        <div className="mx-auto max-w-3xl px-3 py-2.5 sm:px-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="rounded-md bg-emerald-100 p-1">
@@ -451,7 +498,10 @@ export default function SharedMapPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-4 space-y-4">
+      <main className={cn(
+        'mx-auto max-w-3xl space-y-4 px-3 py-4 sm:px-4',
+        editMode && 'pb-32 sm:pb-4'
+      )}>
         {/* Stats + Edit toggle */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -470,7 +520,11 @@ export default function SharedMapPage() {
             <Button
               variant={editMode ? 'default' : 'outline'}
               size="sm"
-              onClick={() => { setEditMode(!editMode); setSelectedAlunoId(null) }}
+              onClick={() => {
+                setEditMode(!editMode)
+                setSelectedAlunoId(null)
+                setPreviewAlunoId(null)
+              }}
             >
               <Pencil className="size-3.5 mr-1" />
               {editMode ? 'Editando' : 'Editar'}
@@ -478,9 +532,26 @@ export default function SharedMapPage() {
           )}
         </div>
 
+        {!editMode && mapData.alunos && mapData.alunos.length > 0 && (
+          <div className="sm:hidden">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-between"
+              onClick={() => setStudentSheetOpen(true)}
+            >
+              <span className="flex items-center gap-2">
+                <Users className="size-4" />
+                Lista de alunos
+              </span>
+              <Badge variant="outline">{mapData.alunos.length}</Badge>
+            </Button>
+          </div>
+        )}
+
         {/* Edit instructions */}
         {editMode && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          <div className="hidden rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 sm:block">
             {selectedAlunoId
               ? '👆 Agora clique na carteira de destino para mover o aluno.'
               : '👆 Clique em um aluno posicionado para selecioná-lo e depois clique na nova carteira.'}
@@ -488,6 +559,47 @@ export default function SharedMapPage() {
         )}
 
         {/* Map grid — com clique pra edição */}
+        {editMode && !selectedAluno && (
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-600 shadow-sm">
+            No celular, tocar no nome da lista costuma ser o jeito mais rÃ¡pido para escolher quem vai mudar de lugar.
+          </div>
+        )}
+
+        {editMode && selectedAluno && (
+          <div className="rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-xs shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-emerald-800">
+                  Movendo {selectedAluno.nome}
+                </p>
+                <p className="mt-1 text-emerald-700">
+                  Toque na nova carteira para mover, ou em outra carteira ocupada para trocar de lugar.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0 border-emerald-200 bg-white/90 text-emerald-700"
+                onClick={() => {
+                  setSelectedAlunoId(null)
+                  setPreviewAlunoId(null)
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {previewAluno && (
+          <DeskStudentPreview
+            aluno={previewAluno}
+            nameMode={mapData.mapa.room_config?.deskLabels?.nameMode ?? 'apelido_ou_curto'}
+            onClear={() => setPreviewAlunoId(null)}
+          />
+        )}
+
         <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
           <div className="p-2 sm:p-3">
             <PublicGrid
@@ -499,20 +611,27 @@ export default function SharedMapPage() {
               selectedAlunoId={selectedAlunoId}
               onCellClick={editMode ? handleCellClick : undefined}
               onSwapStudents={editMode ? handleSwapStudents : undefined}
+              onDeskPreview={setPreviewAlunoId}
             />
           </div>
         </div>
 
         {/* Student list */}
         {mapData.alunos && mapData.alunos.length > 0 && (
-          <div>
+          <div className="hidden sm:block">
             <div className="flex items-center gap-2 mb-2">
               <Users className="size-3.5 text-muted-foreground" />
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Lista de Alunos ({mapData.alunos.length})
               </h2>
             </div>
-            <StudentList alunos={mapData.alunos} />
+            <StudentList
+              alunos={mapData.alunos}
+              interactive={editMode}
+              selectedAlunoId={selectedAlunoId}
+              selectableIds={placedAlunoIds}
+              onSelectAluno={handleSelectAlunoFromList}
+            />
           </div>
         )}
 
@@ -523,6 +642,77 @@ export default function SharedMapPage() {
           </p>
         </div>
       </main>
+
+      {mapData.alunos && mapData.alunos.length > 0 && (
+        <Sheet open={studentSheetOpen} onOpenChange={setStudentSheetOpen}>
+          <SheetContent
+            side="bottom"
+            showCloseButton={false}
+            className="rounded-t-[28px] border-t bg-white px-0 pb-0 pt-0 shadow-2xl sm:hidden"
+          >
+            <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-200" />
+            <SheetHeader className="pb-3 pt-3">
+              <SheetTitle>Lista de alunos</SheetTitle>
+              <SheetDescription>
+                {editMode
+                  ? 'Escolha um aluno ja posicionado e depois toque na carteira de destino.'
+                  : 'Consulte rapidamente a turma e os numeros de chamada.'}
+              </SheetDescription>
+            </SheetHeader>
+            <div className="max-h-[70vh] overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+              <StudentList
+                alunos={mapData.alunos}
+                interactive={editMode}
+                selectedAlunoId={selectedAlunoId}
+                selectableIds={placedAlunoIds}
+                onSelectAluno={handleSelectAlunoFromList}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+
+      {editMode && mapData.alunos && mapData.alunos.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-20 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:hidden">
+          <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white/95 shadow-xl backdrop-blur">
+            <div className="flex items-center gap-2 px-3 pt-3">
+              <Button
+                type="button"
+                variant={selectedAluno ? 'default' : 'outline'}
+                className="h-10 flex-1 justify-between"
+                onClick={() => setStudentSheetOpen(true)}
+              >
+                <span className="flex items-center gap-2">
+                  <Users className="size-4" />
+                  {selectedAluno ? 'Trocar aluno' : 'Abrir lista'}
+                </span>
+                <Badge variant={selectedAluno ? 'secondary' : 'outline'} className="ml-2">
+                  {placedAlunoIds.size}
+                </Badge>
+              </Button>
+              {selectedAluno && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 shrink-0 px-3 text-muted-foreground"
+                  onClick={() => {
+                    setSelectedAlunoId(null)
+                    setPreviewAlunoId(null)
+                  }}
+                >
+                  Cancelar
+                </Button>
+              )}
+            </div>
+            <div className="px-3 pb-3 pt-2 text-[11px] leading-relaxed text-muted-foreground">
+              {selectedAluno
+                ? `Movendo ${selectedAluno.nome}. Agora toque na nova carteira para concluir.`
+                : `${placedAlunoIds.size} aluno(s) ja estao no mapa. Abra a lista para escolher quem vai mudar de lugar.`}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

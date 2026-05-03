@@ -1,5 +1,5 @@
-import type { RoomConfig, WallElement, WallSide } from '@/types/database'
-import { DEFAULT_ROOM_CONFIG } from '@/types/database'
+import type { DeskLabelConfig, RoomConfig, WallElement, WallSide } from '@/types/database'
+import { DEFAULT_DESK_LABEL_CONFIG, DEFAULT_ROOM_CONFIG } from '@/types/database'
 
 export const WALL_SIDES: WallSide[] = ['top', 'right', 'bottom', 'left']
 
@@ -26,6 +26,29 @@ const POSITION_STEPS = [15, 35, 50, 65, 85]
 
 function cloneDefaultWallElements() {
   return DEFAULT_ROOM_CONFIG.wallElements.map((element) => ({ ...element }))
+}
+
+function cloneDefaultDeskLabels(): DeskLabelConfig {
+  return { ...DEFAULT_DESK_LABEL_CONFIG }
+}
+
+export function normalizeDeskLabelConfig(config?: Partial<DeskLabelConfig> | null): DeskLabelConfig {
+  const validNameModes = new Set<DeskLabelConfig['nameMode']>([
+    'apelido_ou_curto',
+    'primeiro_nome',
+    'primeiro_e_segundo',
+    'primeiro_e_iniciais',
+    'nome_completo',
+  ])
+
+  return {
+    nameMode: config?.nameMode && validNameModes.has(config.nameMode)
+      ? config.nameMode
+      : DEFAULT_DESK_LABEL_CONFIG.nameMode,
+    showNumber: typeof config?.showNumber === 'boolean'
+      ? config.showNumber
+      : DEFAULT_DESK_LABEL_CONFIG.showNumber,
+  }
 }
 
 function createElementId(type: WallElement['type']) {
@@ -65,6 +88,7 @@ export function normalizeRoomConfig(config?: RoomConfig | null): RoomConfig {
       boardLabel: DEFAULT_ROOM_CONFIG.boardLabel,
       teacherDesk: DEFAULT_ROOM_CONFIG.teacherDesk,
       wallElements: cloneDefaultWallElements(),
+      deskLabels: cloneDefaultDeskLabels(),
     }
   }
 
@@ -80,6 +104,7 @@ export function normalizeRoomConfig(config?: RoomConfig | null): RoomConfig {
       ? config.teacherDesk
       : DEFAULT_ROOM_CONFIG.teacherDesk,
     wallElements,
+    deskLabels: normalizeDeskLabelConfig(config.deskLabels),
   }
 }
 
@@ -141,12 +166,14 @@ export function applyRoomPreset(
   preset: 'padrao' | 'corredor' | 'laboratorio'
 ) {
   const boardLabel = config.boardLabel?.trim() || DEFAULT_ROOM_CONFIG.boardLabel
+  const deskLabels = normalizeDeskLabelConfig(config.deskLabels)
 
   if (preset === 'corredor') {
     return normalizeRoomConfig({
       boardWall: 'top',
       boardLabel,
       teacherDesk: 'left',
+      deskLabels,
       wallElements: [
         createWallElement('porta', 'right', 20),
         createWallElement('porta', 'bottom', 82),
@@ -162,6 +189,7 @@ export function applyRoomPreset(
       boardWall: 'top',
       boardLabel,
       teacherDesk: 'center',
+      deskLabels,
       wallElements: [
         createWallElement('porta', 'bottom', 85),
         createWallElement('janela', 'left', 25),
@@ -176,6 +204,7 @@ export function applyRoomPreset(
     boardWall: 'top',
     boardLabel,
     teacherDesk: 'center',
+    deskLabels,
     wallElements: [
       createWallElement('porta', 'bottom', 12),
       createWallElement('janela', 'left', 25),
