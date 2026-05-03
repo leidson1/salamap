@@ -74,8 +74,10 @@ ALTER TABLE mapa_compartilhamentos ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can CRUD own compartilhamentos" ON mapa_compartilhamentos
   FOR ALL USING (auth.uid() = user_id);
 
-CREATE POLICY "Anyone can read active shares" ON mapa_compartilhamentos
-  FOR SELECT USING (ativo = TRUE);
+-- O acesso publico acontece apenas pela RPC get_mapa_publico.
+CREATE UNIQUE INDEX mapa_compartilhamentos_unique_active_mapa_id
+  ON mapa_compartilhamentos (mapa_id)
+  WHERE ativo = TRUE;
 
 -- MAPA_HISTORICO (snapshots automaticos)
 CREATE TABLE mapa_historico (
@@ -184,4 +186,7 @@ BEGIN
 
   RETURN result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+REVOKE ALL ON FUNCTION get_mapa_publico(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION get_mapa_publico(TEXT) TO anon, authenticated, service_role;

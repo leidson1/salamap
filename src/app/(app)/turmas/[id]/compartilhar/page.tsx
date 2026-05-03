@@ -34,6 +34,19 @@ export default function CompartilharPage() {
 
   const shareUrl = share ? `${appUrl}/mapa/${share.share_code}` : ''
 
+  const fetchLatestShare = useCallback(async (mapaId: number) => {
+    const { data, error } = await supabase
+      .from('mapa_compartilhamentos')
+      .select('*')
+      .eq('mapa_id', mapaId)
+      .order('ativo', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (error) throw error
+    return (data?.[0] as MapaCompartilhamento | undefined) ?? null
+  }, [supabase])
+
   const fetchData = useCallback(async () => {
     try {
       const [turmaRes, mapaRes] = await Promise.all([
@@ -47,23 +60,14 @@ export default function CompartilharPage() {
       if (mapaRes.data) {
         const m = mapaRes.data as Mapa
         setMapa(m)
-
-        const { data: shareData } = await supabase
-          .from('mapa_compartilhamentos')
-          .select('*')
-          .eq('mapa_id', m.id)
-          .single()
-
-        if (shareData) {
-          setShare(shareData as MapaCompartilhamento)
-        }
+        setShare(await fetchLatestShare(m.id))
       }
     } catch {
       toast.error('Erro ao carregar dados.')
     } finally {
       setLoading(false)
     }
-  }, [supabase, turmaId])
+  }, [fetchLatestShare, supabase, turmaId])
 
   useEffect(() => {
     fetchData()
@@ -74,6 +78,24 @@ export default function CompartilharPage() {
     setCreating(true)
 
     try {
+      const existingShare = await fetchLatestShare(mapa.id)
+      if (existingShare) {
+        if (!existingShare.ativo) {
+          const { error } = await supabase
+            .from('mapa_compartilhamentos')
+            .update({ ativo: true })
+            .eq('id', existingShare.id)
+
+          if (error) throw error
+          setShare({ ...existingShare, ativo: true })
+          toast.success('Link de compartilhamento reativado!')
+        } else {
+          setShare(existingShare)
+          toast.success('Link de compartilhamento ja existente!')
+        }
+        return
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Usuário não autenticado.')
 
@@ -88,7 +110,18 @@ export default function CompartilharPage() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        if ((error as { code?: string }).code === '23505') {
+          const latestShare = await fetchLatestShare(mapa.id)
+          if (latestShare) {
+            setShare(latestShare)
+            toast.success('Link de compartilhamento ja existente!')
+            return
+          }
+        }
+        throw error
+      }
+
       setShare(data as MapaCompartilhamento)
       toast.success('Link de compartilhamento criado!')
     } catch {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -74,6 +74,7 @@ export default function MapaEditorPage() {
   const [selectedFurnitureBlockId, setSelectedFurnitureBlockId] = useState<string | null>(null)
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
   const [selectedRoomElementId, setSelectedRoomElementId] = useState<string | null>('board')
+  const mapaRef = useRef<Mapa | null>(null)
 
   const saveFn = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -81,6 +82,7 @@ export default function MapaEditorPage() {
       console.error('[SalaMap] Save failed: user not authenticated')
       throw new Error('Não autenticado')
     }
+    const currentMapa = mapaRef.current
     const payload = {
       grid: JSON.parse(JSON.stringify(grid)),
       linhas,
@@ -89,12 +91,12 @@ export default function MapaEditorPage() {
       room_config: JSON.parse(JSON.stringify(roomConfig)),
     }
 
-    if (mapa) {
+    if (currentMapa) {
       // Usar .select() pra verificar se realmente salvou
       const { data: updated, error } = await supabase
         .from('mapas')
         .update(payload)
-        .eq('id', mapa.id)
+        .eq('id', currentMapa.id)
         .eq('user_id', user.id)
         .select('id')
         .single()
@@ -104,7 +106,7 @@ export default function MapaEditorPage() {
         throw error
       }
       if (!updated) {
-        console.error('[SalaMap] Save update: 0 rows affected. mapa.id=', mapa.id, 'user.id=', user.id)
+        console.error('[SalaMap] Save update: 0 rows affected. mapa.id=', currentMapa.id, 'user.id=', user.id)
         throw new Error('Nenhuma linha atualizada — verifique permissões do banco.')
       }
     } else {
@@ -118,9 +120,13 @@ export default function MapaEditorPage() {
         console.error('[SalaMap] Save insert error:', error.message, error.details, error.hint)
         throw error
       }
-      if (data) setMapa(data as Mapa)
+      if (data) {
+        const nextMapa = data as Mapa
+        mapaRef.current = nextMapa
+        setMapa(nextMapa)
+      }
     }
-  }, [grid, linhas, colunas, layoutTipo, roomConfig, mapa, turmaId, supabase])
+  }, [grid, linhas, colunas, layoutTipo, roomConfig, turmaId, supabase])
 
   const { trigger: triggerSave, flush: flushSave, saveStatus } = useAutoSave(
     saveFn,
@@ -142,6 +148,7 @@ export default function MapaEditorPage() {
         setAlunos((alunosRes.data as Aluno[]) || [])
         if (mapaRes.data) {
           const m = mapaRes.data as Mapa
+          mapaRef.current = m
           setMapa(m); setGrid(m.grid); setLinhas(m.linhas); setColunas(m.colunas)
           setLayoutTipo(m.layout_tipo)
           setRoomConfig(normalizeRoomConfig(m.room_config as RoomConfig | null))
@@ -157,6 +164,7 @@ export default function MapaEditorPage() {
             setShareUrl(`${window.location.origin}/mapa/${shareData.share_code}`)
           }
         } else {
+          mapaRef.current = null
           setGrid(generateTradicional(5, 6))
           setRoomConfig(normalizeRoomConfig(DEFAULT_ROOM_CONFIG))
         }

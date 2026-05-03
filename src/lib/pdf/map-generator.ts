@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import { generateQrDataUrl } from '@/components/qr-code-card'
-import type { Grid, RoomConfig } from '@/types/database'
+import type { Grid, RoomConfig, WallElement } from '@/types/database'
+import { DEFAULT_ROOM_CONFIG } from '@/types/database'
 import { getCellBlockId, displayName } from '@/lib/map/utils'
 
 interface MapPdfOptions {
@@ -45,23 +46,57 @@ function rgb(c: readonly number[]): [number, number, number] {
   return [c[0], c[1], c[2]]
 }
 
+function drawWallElement(
+  doc: jsPDF,
+  frameLeft: number,
+  frameTop: number,
+  frameRight: number,
+  frameBottom: number,
+  wallT: number,
+  element: WallElement
+) {
+  const ratio = Math.max(0.05, Math.min(0.95, element.position / 100))
+  const isDoor = element.type === 'porta'
+  const fillColor: [number, number, number] = isDoor ? [180, 83, 9] : [56, 189, 248]
+  const strokeColor: [number, number, number] = isDoor ? [146, 64, 14] : [14, 116, 144]
+
+  doc.setFillColor(...fillColor)
+  doc.setDrawColor(...strokeColor)
+  doc.setLineWidth(0.2)
+
+  if (element.wall === 'top' || element.wall === 'bottom') {
+    const usableWidth = frameRight - frameLeft - wallT * 2 - 12
+    const x = frameLeft + wallT + 6 + usableWidth * ratio
+    const y = element.wall === 'top' ? frameTop + 1 : frameBottom - 4
+    doc.rect(x - 2.5, y, 5, 3, 'FD')
+    return
+  }
+
+  const usableHeight = frameBottom - frameTop - wallT * 2 - 12
+  const x = element.wall === 'left' ? frameLeft + 1 : frameRight - 4
+  const y = frameTop + wallT + 6 + usableHeight * ratio
+  doc.rect(x, y - 2.5, 3, 5, 'FD')
+}
+
 export function generateMapPdf(options: MapPdfOptions) {
   const { grid, linhas, colunas, serie, turma, turno, alunoMap, shareUrl, roomConfig, escolaNome, escolaLogoUrl } = options
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
   const pageH = doc.internal.pageSize.getHeight()
+  const config = roomConfig ?? DEFAULT_ROOM_CONFIG
+  const boardAtTop = config.boardWall === 'top'
 
   // --- Layout calculations ---
   const headerH = 18
   const footerH = 10
   const marginX = 12
   const wallT = 5 // wall thickness
-  const teacherH = roomConfig?.teacherDesk !== 'none' ? 10 : 0
+  const teacherH = config.teacherDesk !== 'none' ? 10 : 0
   const boardH = 4
 
-  const innerTop = headerH + wallT + boardH + teacherH + 2
-  const innerBottom = pageH - footerH - wallT - 2
+  const innerTop = headerH + wallT + (boardAtTop ? boardH + teacherH : 0) + 2
+  const innerBottom = pageH - footerH - wallT - (!boardAtTop ? boardH + teacherH : 0) - 2
   const innerLeft = marginX + wallT
   const innerRight = pageW - marginX - wallT
 
@@ -145,7 +180,9 @@ export function generateMapPdf(options: MapPdfOptions) {
   // --- Board ---
   const boardW = Math.min(frameW * 0.4, 80)
   const boardX = frameLeft + (frameW - boardW) / 2
-  const boardY = frameTop + wallT - 1
+  const boardY = boardAtTop
+    ? frameTop + wallT - 1
+    : frameBottom - wallT - boardH + 1
 
   doc.setFillColor(...rgb(C.boardBg))
   doc.setDrawColor(...rgb(C.boardBorder))
@@ -155,15 +192,17 @@ export function generateMapPdf(options: MapPdfOptions) {
   doc.setTextColor(...rgb(C.boardBorder))
   doc.setFontSize(5)
   doc.setFont('helvetica', 'bold')
-  doc.text(roomConfig?.boardLabel || 'QUADRO', boardX + boardW / 2, boardY + boardH / 2 + 1, { align: 'center' })
+  doc.text(config.boardLabel || 'QUADRO', boardX + boardW / 2, boardY + boardH / 2 + 1, { align: 'center' })
 
   // --- Teacher desk ---
-  if (roomConfig?.teacherDesk !== 'none') {
+  if (config.teacherDesk !== 'none') {
     const tDeskW = 22
     const tDeskH = 7
-    const tDeskY = frameTop + wallT + boardH + 1
+    const tDeskY = boardAtTop
+      ? frameTop + wallT + boardH + 1
+      : frameBottom - wallT - boardH - teacherH + 1
 
-    const pos = roomConfig?.teacherDesk || 'center'
+    const pos = config.teacherDesk || 'center'
     const tDeskX = pos === 'left'
       ? frameLeft + wallT + 6
       : pos === 'right'
@@ -187,9 +226,15 @@ export function generateMapPdf(options: MapPdfOptions) {
     doc.text('Professor', tDeskX + tDeskW / 2, tDeskY + tDeskH / 2 + 1, { align: 'center' })
   }
 
+  config.wallElements.forEach((element) => {
+    drawWallElement(doc, frameLeft, frameTop, frameRight, frameBottom, wallT, element)
+  })
+
   // --- Separator line ---
   if (teacherH > 0) {
-    const sepY = frameTop + wallT + boardH + teacherH + 1
+    const sepY = boardAtTop
+      ? frameTop + wallT + boardH + teacherH + 1
+      : frameBottom - wallT - boardH - teacherH - 1
     doc.setDrawColor(...rgb(C.deskEmptyBorder))
     doc.setLineWidth(0.15)
     doc.setLineDashPattern([2, 1], 0)
@@ -312,8 +357,20 @@ export function generateMapPdf(options: MapPdfOptions) {
   doc.rect(0, pageH - footerH, pageW, footerH, 'F')
 
   doc.setTextColor(160, 160, 160)
+  doc.setFontSize(4.5)
+  const openingsSummary = config.wallElements.length === 0
+    ? 'sem aberturas'
+    : `${config.wallElements.filter((element) => element.type === 'porta').length} porta(s) e ${config.wallElements.filter((element) => element.type === 'janela').length} janela(s)`
+  const teacherDeskSummary = config.teacherDesk === 'none' ? 'sem mesa do professor' : `mesa do professor: ${config.teacherDesk}`
+  doc.text(
+    `Quadro: ${boardAtTop ? 'superior' : 'inferior'} | ${teacherDeskSummary} | ${openingsSummary}`,
+    pageW / 2,
+    pageH - footerH / 2 - 1.2,
+    { align: 'center' }
+  )
+
   doc.setFontSize(5)
-  doc.text('SalaMap - salamap.profdia.com.br', pageW / 2, pageH - footerH / 2 + 1, { align: 'center' })
+  doc.text('SalaMap - salamap.profdia.com.br', pageW / 2, pageH - footerH / 2 + 1.5, { align: 'center' })
 
   doc.save(`mapa-${serie}-${turma}.pdf`)
 }
