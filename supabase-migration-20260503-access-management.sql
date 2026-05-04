@@ -200,10 +200,10 @@ BEGIN
     RAISE EXCEPTION 'Solicitacao nao encontrada ou sem permissao.';
   END IF;
 
-  SELECT COALESCE(NULLIF(TRIM(email), ''), '')
+  SELECT COALESCE(NULLIF(TRIM(p.email), ''), '')
     INTO v_email
-  FROM profiles
-  WHERE id = v_request.user_id;
+  FROM profiles p
+  WHERE p.id = v_request.user_id;
 
   SELECT tc.id
     INTO v_share_id
